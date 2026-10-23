@@ -1,0 +1,12 @@
+[
+  {
+    "id": "custom-e3cc4b37",
+    "name": "www.theglobeandmail.com",
+    "url": "https://www.theglobeandmail.com/arc/outboundfeeds/rss/category/business/",
+    "kind": "auto",
+    "category": "Custom",
+    "reliability": 0.7,
+    "region": "CA",
+    "enabled": true
+  }
+]
