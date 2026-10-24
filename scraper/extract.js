@@ -13,7 +13,8 @@ export function cleanTitle(title) {
 
 export function extractCompany(title) {
   const t = cleanTitle(title);
-  const suffixed = t.match(/([A-Z][\w&.' -]{2,50}?\s(?:Inc\.?|Corp\.?|Corporation|Ltd\.?|Limited|Holdings|Group|Capital|Partners|Resources|Technologies|Energy|Mining)(?:\s\((?:TSX|TSXV|TSX-V|CSE|NEO|NYSE|NASDAQ)[^)]*\))?)/);
+  // Consecutive suffix words stay together ("Test Mining Ltd." not "Test Mining")
+  const suffixed = t.match(/([A-Z][\w&.' -]{2,50}?(?:\s(?:Inc\.?|Corp\.?|Corporation|Ltd\.?|Limited|Holdings|Group|Capital|Partners|Resources|Technologies|Energy|Mining))+(?:\s\((?:TSX|TSXV|TSX-V|CSE|NEO|NYSE|NASDAQ)[^)]*\))?)/);
   if (suffixed) return suffixed[1].trim();
   const parts = t.split(VERBS);
   // No verb found => the "head" is the whole sentence, not a company name

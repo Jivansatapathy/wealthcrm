@@ -28,13 +28,25 @@ export function isSafeUrl(u) {
   } catch { return false; }
 }
 
-async function fetchSource(src) {
-  if (src.kind === 'edgar-formd') return fetchFormD();
-  const res = await fetch(src.url, { headers: { 'User-Agent': UA, Accept: 'application/rss+xml, application/atom+xml, text/html, */*' }, signal: AbortSignal.timeout(15000) });
+/**
+ * @param hints optional { days, isKnown, validators } so callers never re-download what they already hold:
+ *   days        - EDGAR search window
+ *   isKnown     - (link) => boolean, EDGAR filings already stored are not fetched again
+ *   validators  - { etag, last_modified } from the previous fetch; an unchanged feed answers 304 and costs one tiny request
+ * The returned array carries `validators` / `notModified` for the caller to persist.
+ */
+export async function fetchSource(src, hints = {}) {
+  if (src.kind === 'edgar-formd') return fetchFormD({ days: hints.days, isKnown: hints.isKnown });
+  const headers = { 'User-Agent': UA, Accept: 'application/rss+xml, application/atom+xml, text/html, */*' };
+  if (hints.validators?.etag) headers['If-None-Match'] = hints.validators.etag;
+  if (hints.validators?.last_modified) headers['If-Modified-Since'] = hints.validators.last_modified;
+  const res = await fetch(src.url, { headers, signal: AbortSignal.timeout(15000) });
+  if (res.status === 304) return Object.assign([], { notModified: true, validators: hints.validators });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const body = await res.text();
   const isFeed = src.kind === 'rss' || src.kind === 'atom' || /<(rss|feed)[\s>]/i.test(body.slice(0, 2000));
-  return isFeed ? parseFeed(body) : parseHtmlLinks(body, src.url);
+  const items = isFeed ? parseFeed(body) : parseHtmlLinks(body, src.url);
+  return Object.assign(items, { validators: { etag: res.headers.get('etag'), last_modified: res.headers.get('last-modified') } });
 }
 
 const idFor = (link, title) => 'SCR-' + createHash('sha1').update(link || title).digest('hex').slice(0, 10).toUpperCase();
@@ -111,7 +123,7 @@ function stack(leads) {
   return [...byKey.values()];
 }
 
-export async function runScrape({ customSources = [], crmData = {}, now = Date.now() } = {}) {
+export async function runScrape({ customSources = [], crmData = {}, now = Date.now(), knownLinks } = {}) {
   const idx = buildCrmIndex(crmData);
   const sources = [...BUILTIN_SOURCES, ...customSources.filter((s) => s.enabled !== false)];
   const report = [];
@@ -121,7 +133,7 @@ export async function runScrape({ customSources = [], crmData = {}, now = Date.n
     const started = Date.now();
     const base = { id: src.id, name: src.name, category: src.category, url: src.url, custom: src.id.startsWith('custom-') };
     try {
-      const items = await fetchSource(src);
+      const items = await fetchSource(src, { isKnown: knownLinks ? (l) => knownLinks.has(l) : undefined });
       const details = [];
       let kept = 0;
       for (const item of items) {

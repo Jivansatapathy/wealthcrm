@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import IntentEngineView from './components/IntentEngineView';
 import SourceIntelligenceView from './components/SourceIntelligenceView';
+import LeadAcquisitionView from './components/LeadAcquisitionView';
 import OpportunityPipelineView from './components/OpportunityPipelineView';
 import Client360View from './components/Client360View';
 import ReferralHubView from './components/ReferralHubView';
@@ -11,15 +12,17 @@ import AdvisorCopilotView from './components/AdvisorCopilotView';
 import ExecutiveAnalyticsView from './components/ExecutiveAnalyticsView';
 import LeadDetailDrawer from './components/LeadDetailDrawer';
 import ToastContainer from './components/ToastContainer';
+import { ENABLED_VIEWS } from './views';
 import { fetchCanadianMarketIntelligence } from './services/marketDataService';
 
 export default function App() {
   // Deep link support, e.g. http://localhost:3000/#source_intel
   const [currentView, setCurrentView] = useState(() => {
     const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : '';
-    return ['intent_stream', 'source_intel', 'pipeline', 'client360', 'referrals', 'copilot', 'analytics'].includes(hash) ? hash : 'intent_stream';
+    return ENABLED_VIEWS.includes(hash) ? hash : 'intent_stream';
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false); // sidebar drawer on narrow screens
   const [leads, setLeads] = useState([...WEALTH_DATA.intentLeads]);
   const [pipeline, setPipeline] = useState([...WEALTH_DATA.pipelineOpportunities]);
   const [referrals, setReferrals] = useState([...WEALTH_DATA.referrals]);
@@ -71,7 +74,9 @@ export default function App() {
       stageLabel: "Advisor Qualified",
       estimatedAUM: lead.estimatedAUM,
       probability: "50%",
-      expectedRevenue: `$${Math.round(parseInt(lead.estimatedAUM.replace(/[^0-9]/g, '')) * 0.009 * 1000).toLocaleString()}/yr`,
+      expectedRevenue: /\d/.test(lead.estimatedAUM)
+        ? `$${Math.round(parseInt(lead.estimatedAUM.replace(/[^0-9]/g, '')) * 0.009 * 1000).toLocaleString()}/yr`
+        : 'To be sized',
       assignedAdvisor: WEALTH_DATA.currentUser.name,
       division: lead.targetDivision,
       nextAction: "Deliver AI customized corporate wealth briefing",
@@ -179,7 +184,9 @@ export default function App() {
       {/* Sidebar Navigation */}
       <Sidebar
         currentView={currentView}
-        setCurrentView={setCurrentView}
+        setCurrentView={(v) => { setCurrentView(v); setMenuOpen(false); }}
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
         intentCount={leads.length}
         pendingReferralCount={pendingReferralCount}
         user={WEALTH_DATA.currentUser}
@@ -192,6 +199,7 @@ export default function App() {
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           onSimulateIntent={handleSimulateIntent}
+          onMenu={() => setMenuOpen(true)}
         />
 
         <section className="page-viewport">
@@ -211,6 +219,10 @@ export default function App() {
 
           {currentView === 'source_intel' && (
             <SourceIntelligenceView onFetchLiveMarketData={handleFetchLiveMarketData} />
+          )}
+
+          {currentView === 'acquisition' && (
+            <LeadAcquisitionView onPromoteLead={handlePromoteLead} showToast={showToast} />
           )}
 
           {currentView === 'pipeline' && (

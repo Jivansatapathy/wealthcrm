@@ -8,11 +8,11 @@ export const SIGNAL_RULES = [
     rationale: 'A sale or acquisition creates a personal liquidity event for founders and shareholders: proceeds need tax-efficient structuring.',
     strategy: 'Post-liquidity wealth plan: holdco/trust structuring, tax-efficient discretionary portfolio, and estate freeze.' },
   { type: 'Liquidity Event: IPO / Public Listing', weight: 58, division: 'ScotiaMcLeod & Private Banking', urgency: 'Immediate (<7 Days)', hot: true,
-    re: /\b(ipo|initial public offering|going public|bought deal|direct listing|graduat\w+ to (?:the )?tsx|begins trading|prospectus)\b/i,
+    re: /\b(ipo|initial public offering|going public|direct listing|graduat\w+ to (?:the )?tsx|begins trading|prospectus)\b/i,
     rationale: 'A listing or offering unlocks founder and insider equity and often brings lock-up expiries and diversification needs.',
     strategy: 'Concentrated-position and lock-up diversification plan with hedging and charitable-giving options.' },
   { type: 'Corporate Liquidity: Financing / Private Placement', weight: 50, division: 'Commercial Wealth Advisory', urgency: 'Urgent (<14 Days)', hot: true,
-    re: /\b(private placement|financing|raises?|raised|closes? (?:\$|c\$)|capital raise|credit facility|secondary offering|non-brokered)\b/i,
+    re: /\b(private placement|bought deal|financing|raises?|raised|closes? (?:\$|c\$)|capital raise|credit facility|secondary offering|non-brokered)\b/i,
     rationale: 'Fresh capital raises corporate treasury balances; surplus cash retained in a holdco can trigger passive-income tax drag.',
     strategy: 'Corporate treasury and holdco investment mandate using corporate-class / tax-sheltered structures.' },
   { type: 'Succession & Retirement Trigger', weight: 52, division: 'ScotiaMcLeod & Private Banking', urgency: 'Urgent (<14 Days)', hot: false,
@@ -41,7 +41,12 @@ const RESIDENTIAL_RE = /\b(over asking|home|house|condo|bungalow|townhouse|detac
 const DEBT_OR_ROUNDUP_RE = /\b(bonds?|notes|debentures?|news of the day|morning (?:brief|roundup)|stock market today)\b/i;
 const OWNER_RE =/\b(founder|co-founder|owner|family-owned|privately[- ]held|private company|family business|shareholders?)\b/i;
 const US_ONLY_RE = /\b(nasdaq|nyse|u\.s\.)/i;
-const CANADA_RE = /\b(canad\w*|tsx|tsxv|tsx-v|cse|neo exchange|toronto|vancouver|calgary|montr[eé]al|ottawa|edmonton|winnipeg|halifax|ontario|alberta|british columbia|quebec|québec|manitoba|saskatchewan|nova scotia|c\$|cad)\b/i;
+const US_STATES = 'alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|wisconsin|wyoming';
+// A state counts only in location phrasing (", Iowa" / "in Texas"), so "Nevada Copper" or "a Delaware corporation" are not misread as US
+export const US_RE = new RegExp(`\\b(?:u\\.s\\.|united states|usa|nyse|nasdaq|chicago|boston|san francisco|los angeles|seattle|washington,? d\\.?c\\.?)\\b|(?:,\\s*|\\b(?:in|of|from|throughout)\\s+)(?:${US_STATES})\\b`, 'i');
+/** Cross-border legend ("not for distribution to U.S. news wire services…") says nothing about where a company is. */
+export const stripDisclaimers = (text) => text.replace(/not for (?:distribution|dissemination|release)[^.]*?(?:united states|u\.s\.)[^.]*\.?/gi, ' ');
+export const CANADA_RE = /\b(canad\w*|tsx|tsxv|tsx-v|cse|neo exchange|toronto|vancouver|calgary|montr[eé]al|ottawa|edmonton|winnipeg|halifax|ontario|alberta|british columbia|quebec|québec|manitoba|saskatchewan|nova scotia|c\$|cad)\b/i;
 
 /** Largest dollar amount in the text, as CAD-equivalent dollars (US$ x1.35, rough). */
 export function extractAmount(text) {
@@ -93,7 +98,7 @@ export function scoreItem(item, source, now = Date.now()) {
 }
 
 /** Same as scoreItem, but a rejected item returns { reject: 'why' } so the UI can explain it. */
-export function evaluateItem(item, source, now = Date.now()) {
+export function evaluateItem(item, source, now = Date.now(), opts = {}) {
   const text = `${item.title}. ${item.summary || ''}`;
   if (NOISE_RE.test(item.title) && !/acqui|sale|financing|placement/i.test(item.title)) return { reject: 'Event or notice announcement' };
   if (COMMENTARY_RE.test(item.title.trim())) return { reject: 'Opinion / stock-tip headline' };
@@ -124,9 +129,13 @@ export function evaluateItem(item, source, now = Date.now()) {
   const textCa = CANADA_RE.test(text);
   const canadian = textCa || source.region === 'CA';
   // Canadian relevance gate: only Canadian wires get a pass; everything else must show a Canadian link in the text
-  if (!canadian) return { reject: 'No Canadian link' };
-  if (!textCa && US_ONLY_RE.test(text)) { raw -= 14; reasons.push({ label: 'US-listed, no Canadian nexus', points: -14 }); }
-  else if (source.region !== 'CA') { raw += 4; reasons.push({ label: 'Canadian nexus in text', points: 4 }); }
+  // opts.allowUS widens the market gate to the US (used by the acquisition pipeline; the Intent Engine stays Canada-only)
+  const usOk = opts.allowUS && (US_RE.test(text) || source.region === 'US');
+  if (!canadian && !usOk) return { reject: 'No Canadian link' };
+  if (canadian) {
+    if (!textCa && !opts.allowUS && US_ONLY_RE.test(text)) { raw -= 14; reasons.push({ label: 'US-listed, no Canadian nexus', points: -14 }); }
+    else if (source.region !== 'CA') { raw += 4; reasons.push({ label: 'Canadian nexus in text', points: 4 }); }
+  }
 
   if (OWNER_RE.test(text)) { raw += 8; reasons.push({ label: 'Owner / founder / private-company language', points: 8 }); }
 

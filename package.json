@@ -8,8 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "scraper": "node scraper/index.js",
-    "scraper:once": "node scraper/index.js --once"
+    "scraper": "node --env-file-if-exists=.env scraper/index.js",
+    "scraper:once": "node --env-file-if-exists=.env scraper/index.js --once"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

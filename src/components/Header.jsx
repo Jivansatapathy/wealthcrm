@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Search, Zap, Bell, Check, Building, AlertCircle } from 'lucide-react';
+import { Menu, Search, Zap, Bell, Check, Building, AlertCircle } from 'lucide-react';
 
-export default function Header({ currentView, searchQuery, setSearchQuery, onSimulateIntent }) {
+export default function Header({ currentView, searchQuery, setSearchQuery, onSimulateIntent, onMenu }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(3);
 
@@ -38,6 +38,10 @@ export default function Header({ currentView, searchQuery, setSearchQuery, onSim
       title: "Source Intelligence",
       tag: "Per-URL Scrape Results"
     },
+    acquisition: {
+      title: "Lead Acquisition Console",
+      tag: "Permissioned · Consent-Gated · Audited"
+    },
     pipeline: {
       title: "Wealth Opportunity Pipeline",
       tag: "Canadian Banking AUM Inflow"
@@ -65,6 +69,7 @@ export default function Header({ currentView, searchQuery, setSearchQuery, onSim
   return (
     <header className="top-navbar">
       <div className="nav-left-group">
+        <button type="button" className="btn btn-secondary btn-sm mobile-menu-btn" onClick={onMenu} aria-label="Open menu" aria-controls="appSidebar"><Menu size={18} /></button>
         <h1 className="page-context-title">
           {current.title}
           {current.tag && (

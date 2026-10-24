@@ -106,11 +106,21 @@ const liveMarketDataPlugin = () => ({
 
 export default defineConfig({
   plugins: [react(), liveMarketDataPlugin()],
+  build: {
+    // Two pages: the CRM and the public opt-in enquiry form
+    rollupOptions: { input: { main: 'index.html', enquiry: 'enquiry.html', calculator: 'calculator.html' } }
+  },
   server: {
     port: 3000,
     open: false,
     // Intent scraper service (npm run scraper)
     proxy: {
+      // Lead-acquisition pipeline (same scraper service, /acq routes)
+      '/api/acq': {
+        target: 'http://localhost:3100',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api\/acq/, '/acq')
+      },
       '/api/intent': {
         target: 'http://localhost:3100',
         changeOrigin: true,

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retirement savings calculator</title>
+  <style>
+    :root { --bg:#f7f7f9; --fg:#1b1b22; --muted:#5b5b6a; --card:#fff; --line:#d9d9e3; --accent:#3b3bd6; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#14141a; --fg:#ececf3; --muted:#a0a0b2; --card:#1d1d26; --line:#34343f; --accent:#8b8bff; } }
+    [hidden] { display:none !important; }
+    *, *::before, *::after { box-sizing:border-box; }
+    input, select, button { max-width:100%; }
+    @media (max-width:520px) { main { padding:16px 12px 72px; } form, .box { padding:14px; } input, select { font-size:16px; } .nav button, a.btn { flex:1; text-align:center; } h1 { font-size:1.4rem; } }
+    body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+    main { max-width: 560px; margin: 0 auto; padding: 24px 16px 64px; }
+    .box { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; display:grid; gap:14px; margin-bottom:16px; }
+    label { display:grid; gap:4px; font-size:.9rem; }
+    input { font: inherit; padding:9px 10px; border-radius:8px; border:1px solid var(--line); background:transparent; color:inherit; }
+    a.btn { display:inline-block; padding:10px 14px; border-radius:8px; background:var(--accent); color:#fff; text-decoration:none; }
+    .muted { color:var(--muted); font-size:.82rem; }
+    .big { font-size:1.8rem; font-weight:700; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Retirement savings calculator</h1>
+  <p class="muted">A simple projection. Nothing you type here is sent or stored; the calculation runs in your browser.</p>
+  <div class="box">
+    <label>Current age<input id="age" type="number" min="18" max="90" value="40" /></label>
+    <label>Retirement age<input id="ret" type="number" min="40" max="90" value="65" /></label>
+    <label>Current savings ($)<input id="bal" type="number" min="0" value="150000" /></label>
+    <label>Saved each year ($)<input id="add" type="number" min="0" value="12000" /></label>
+    <label>Assumed annual return (%)<input id="rate" type="number" min="0" max="15" step="0.1" value="5" /></label>
+  </div>
+  <div class="box" aria-live="polite">
+    <span class="muted">Projected balance at retirement</span>
+    <span class="big" id="out">—</span>
+    <span class="muted">Illustrative only, in nominal dollars, before fees, tax and inflation. It is not advice and the return is an assumption, not a forecast.</span>
+    <div><a class="btn" id="cta" href="enquiry.html?advice=retirement_planning">Talk to an advisor about this</a></div>
+    <span class="muted">Following this link shares nothing. The enquiry form only preselects a topic and a broad asset range for you to confirm.</span>
+  </div>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const num = (id) => Math.max(0, Number($(id).value) || 0);
+  function band(v) { return v < 250e3 ? 'under_250k' : v < 1e6 ? '250k_1m' : v < 5e6 ? '1m_5m' : '5m_plus'; }
+  function calc() {
+    const years = Math.max(0, num('ret') - num('age')), r = num('rate') / 100;
+    let bal = num('bal');
+    for (let i = 0; i < years; i++) bal = bal * (1 + r) + num('add');
+    $('out').textContent = bal.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 });
+    // Preselect the band of CURRENT savings (what the person typed), never the projection
+    $('cta').href = `enquiry.html?advice=retirement_planning&assets=${band(num('bal'))}`;
+  }
+  document.querySelectorAll('input').forEach((el) => el.addEventListener('input', calc));
+  calc();
+</script>
+<script src="/consent.js" defer></script>
+</body>
+</html>

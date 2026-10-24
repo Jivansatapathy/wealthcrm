@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { runScrape, isSafeUrl } from './pipeline.js';
 import { BUILTIN_SOURCES } from './sources.js';
+import { createContext, createApi, startScheduler } from './acquisition/index.js';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(DIR, 'data');
@@ -30,7 +31,17 @@ async function scrape() {
   if (running) return running;
   running = (async () => {
     const t0 = Date.now();
-    const { leads, report } = await runScrape({ customSources: readJson(CUSTOM_FILE, []), crmData: await loadCrm() });
+    // Filings we already evaluated (kept or filtered) are not downloaded again; their earlier results are carried forward below
+    const prevItems = new Map((state.report || []).map((r) => [r.id, r.items || []]));
+    const knownLinks = new Set([...state.leads.map((l) => l.externalUrl), ...[...prevItems.values()].flat().map((i) => i.link)].filter(Boolean));
+    const { leads, report: fresh } = await runScrape({ customSources: readJson(CUSTOM_FILE, []), crmData: await loadCrm(), knownLinks });
+    const report = fresh.map((r) => {
+      if (!r.ok || r.id !== 'edgar-form-d-ca') return r;
+      const seen = new Set((r.items || []).map((i) => i.link));
+      const items = [...(r.items || []), ...(prevItems.get(r.id) || []).filter((i) => !seen.has(i.link))].slice(0, 150);
+      const signals = items.filter((i) => i.status === 'signal').length;
+      return { ...r, items, fetched: items.length, signals, filtered: items.length - signals };
+    });
     // Keep previously-seen leads that this run didn't return (feeds roll off), preserving firstSeen
     const prev = new Map(state.leads.map((l) => [l.id, l]));
     const merged = new Map(leads.map((l) => [l.id, { ...l, firstSeen: prev.get(l.id)?.firstSeen || l.firstSeen }]));
@@ -104,8 +115,13 @@ const send = (res, code, body) => {
 };
 const readBody = (req) => new Promise((resolve) => { let b = ''; req.on('data', (c) => (b += c)); req.on('end', () => { try { resolve(JSON.parse(b || '{}')); } catch { resolve({}); } }); });
 
+// Lead-acquisition pipeline (permission-gated sources, consent, review). Routes live under /acq (proxied as /api/acq).
+const acqCtx = createContext({ customSources: () => readJson(CUSTOM_FILE, []), crmData: await loadCrm() });
+const acqApi = createApi(acqCtx);
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
+  if (await acqApi(req, res, url)) return;
   if (req.method === 'OPTIONS') return send(res, 204, {});
   try {
     if (url.pathname === '/health') return send(res, 200, { ok: true, updatedAt: state.updatedAt, scraping: !!running });
@@ -151,6 +167,7 @@ if (process.argv.includes('--once')) {
   server.listen(PORT, () => {
     console.log(`[scraper] Intent service on http://localhost:${PORT} (refresh every ${INTERVAL_MIN} min)`);
     scrape().catch((e) => console.error('[scraper] initial scrape failed:', e));
+    startScheduler(acqCtx);
     setInterval(() => scrape().catch((e) => console.error('[scraper] scrape failed:', e)), INTERVAL_MIN * 60 * 1000);
   });
 }

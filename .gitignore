@@ -26,3 +26,6 @@ dist-ssr
 # Environment secrets (never commit .env)
 .env
 .env*.local
+
+# Acquisition pipeline data contains personal data and dev tokens
+scraper/data/acq/

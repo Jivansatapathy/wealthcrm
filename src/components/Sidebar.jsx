@@ -1,8 +1,9 @@
 import React from 'react';
-import { Zap, BarChart3, Building2, RefreshCw, Bot, TrendingUp, Radar } from 'lucide-react';
+import { ENABLED_VIEWS } from '../views';
+import { Zap, BarChart3, Building2, RefreshCw, Bot, TrendingUp, Radar, ShieldCheck } from 'lucide-react';
 
-export default function Sidebar({ currentView, setCurrentView, intentCount, pendingReferralCount, user }) {
-  const navSections = [
+export default function Sidebar({ currentView, setCurrentView, open, onClose, intentCount, pendingReferralCount, user }) {
+  const allSections = [
     {
       title: "Client Acquisition Engine",
       items: [
@@ -18,6 +19,12 @@ export default function Sidebar({ currentView, setCurrentView, intentCount, pend
           label: "Source Intelligence",
           icon: <Radar size={18} />,
           badge: "Scraper"
+        },
+        {
+          id: "acquisition",
+          label: "Lead Acquisition",
+          icon: <ShieldCheck size={18} />,
+          badge: "Verified"
         },
         {
           id: "pipeline",
@@ -61,8 +68,14 @@ export default function Sidebar({ currentView, setCurrentView, intentCount, pend
     }
   ];
 
+  const navSections = allSections
+    .map((s) => ({ ...s, items: s.items.filter((i) => ENABLED_VIEWS.includes(i.id)) }))
+    .filter((s) => s.items.length);
+
   return (
-    <aside className="app-sidebar" id="appSidebar">
+    <>
+    {open && <div className="sidebar-scrim" onClick={onClose} aria-hidden="true" />}
+    <aside className={`app-sidebar ${open ? 'open' : ''}`} id="appSidebar">
       {/* Brand Header */}
       <div className="brand-header">
         <div className="brand-logo-badge">VGT</div>
@@ -110,5 +123,6 @@ export default function Sidebar({ currentView, setCurrentView, intentCount, pend
         </div>
       </div>
     </aside>
+    </>
   );
 }

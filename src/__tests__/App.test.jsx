@@ -4,7 +4,15 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import App from '../App';
 
 describe('App Full Integration Test', () => {
-  it('switches between all navigation views properly', () => {
+  it('shows only the enabled views in the sidebar', () => {
+    render(<App />);
+    expect(screen.getByText('AI Intent Engine')).toBeInTheDocument();
+    expect(screen.getByText('Lead Acquisition')).toBeInTheDocument();
+    ['Opportunity Pipeline', 'Client 360° & Households', 'Cross-Division Referrals', 'AI Advisor Copilot', 'Executive Analytics']
+      .forEach((n) => expect(screen.queryByText(n)).not.toBeInTheDocument());
+  });
+
+  it.skip('switches between all navigation views properly (views currently hidden, see src/views.js)', () => {
     render(<App />);
 
     // 1. Initial view: AI Intent Engine
@@ -58,7 +66,7 @@ describe('App Full Integration Test', () => {
     expect(screen.getByText('$151.7M')).toBeInTheDocument();
   });
 
-  it('promotes unpromoted lead (Marc Edwards) to Opportunity Pipeline and appears in Kanban board', () => {
+  it.skip('promotes unpromoted lead (Marc Edwards) to Opportunity Pipeline and appears in Kanban board', () => {
     render(<App />);
 
     // In the Intent Engine, find Marc Edwards's card (Kane Biotech)
