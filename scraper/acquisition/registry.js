@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { BUILTIN_SOURCES } from '../sources.js';
 import { isSafeUrl } from '../pipeline.js';
 import { audit } from './audit.js';
+import { GOOGLE_SOURCES, OTHER_MARKET_SOURCES } from './google.js';
 
 export const PERMISSION_STATUSES = ['approved', 'approved_with_restrictions', 'pending_review', 'prohibited', 'expired'];
 export const ACCESS_METHODS = ['rss', 'html', 'api', 'csv', 'form'];
@@ -18,6 +19,7 @@ const BUILTIN_META = {
   'news-founder-exits': { source_type: 'news_rss', geo: ['CA'], licence_type: 'Google News RSS search results linking to publisher content; Google and publisher terms apply (review required)', refresh: 60 },
   'news-exec-change': { source_type: 'news_rss', geo: ['CA'], licence_type: 'Google News RSS search results linking to publisher content; Google and publisher terms apply (review required)', refresh: 60 },
   'edgar-form-d-ca': { source_type: 'regulatory_filing', geo: ['CA', 'US'], licence_type: 'US government public data (SEC EDGAR); fair-access policy: declared User-Agent, max 10 requests/second', refresh: 60, auth: 'None; User-Agent with contact required (set SCRAPER_CONTACT)' },
+  'midu-funding-ca': { source_type: 'funding_news', geo: ['CA'], licence_type: 'Midu API terms (midu.si/api#terms): internal use only, no resale or bulk redistribution; attribution "Data: Midu (midu.si)" required (review required)', refresh: 360, auth: 'API key (MIDU_API_KEY), 1,000 requests/day' },
   'edgar-13d': { source_type: 'regulatory_filing', geo: ['US'], licence_type: 'US government public data (SEC EDGAR); fair-access policy: declared User-Agent, max 10 requests/second', refresh: 60, auth: 'None; User-Agent with contact required (set SCRAPER_CONTACT)' },
 };
 
@@ -64,7 +66,7 @@ function baseOf(ctx) {
     const m = BUILTIN_META[s.id] || {};
     return {
       source_id: s.id, source_name: s.name, source_type: m.source_type || 'news_rss', geographic_coverage: m.geo || ['CA'],
-      source_url: s.url, access_method: s.kind === 'edgar-formd' ? 'api' : s.kind === 'atom' ? 'rss' : s.kind,
+      source_url: s.url, access_method: s.kind === 'edgar-formd' || s.kind === 'midu' ? 'api' : s.kind === 'atom' ? 'rss' : s.kind,
       endpoint: s.url, auth: m.auth || 'None', licence_type: m.licence_type || 'Unknown (review required)',
       reliability: s.reliability, kind: s.kind, refresh: m.refresh || 60, region: s.region, builtin: true,
     };
@@ -76,7 +78,7 @@ function baseOf(ctx) {
   }));
   const added = Object.values(ctx.store.get('acq_sources', {})).map((s) => ({ ...s, custom: true }));
   const system = SYSTEM_SOURCES.map((s) => ({ ...s, endpoint: null, refresh: 0, region: 'any', kind: 'form', system: true }));
-  return [...builtin, ...system, ...legacy, ...added];
+  return [...builtin, ...GOOGLE_SOURCES, ...OTHER_MARKET_SOURCES, ...system, ...legacy, ...added];
 }
 
 export function listSources(ctx) {
@@ -93,7 +95,7 @@ export function listSources(ctx) {
     else if (!gate.allowed) health = 'blocked';
     else if (st.paused) health = 'paused';
     else if (st.last_attempted_fetch) health = failing ? 'failing' : st.consecutive_failures ? 'degraded' : 'healthy';
-    const hasConnector = b.access_method === 'rss' || b.access_method === 'html' || b.kind === 'edgar-formd';
+    const hasConnector = b.market || b.access_method === 'rss' ||b.access_method === 'html' || b.kind === 'edgar-formd' || b.kind === 'midu';
     return {
       ...b,
       connector: b.system || b.access_method === 'csv' ? 'manual' : hasConnector ? 'implemented' : 'not_implemented',

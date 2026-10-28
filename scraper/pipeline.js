@@ -6,6 +6,7 @@ import { evaluateItem, formatAmount } from './score.js';
 import { cleanTitle, extractCompany, extractPerson, extractLocation } from './extract.js';
 import { buildCrmIndex, matchCrm, norm } from './match.js';
 import { fetchFormD } from './edgar.js';
+import { fetchMidu } from './midu.js';
 
 // Size of the disclosed event, not an assumption about any person's wealth.
 export function tierFor(amount) {
@@ -36,6 +37,7 @@ export function isSafeUrl(u) {
  * The returned array carries `validators` / `notModified` for the caller to persist.
  */
 export async function fetchSource(src, hints = {}) {
+  if (src.kind === 'midu') return fetchMidu({ key: process.env.MIDU_API_KEY, days: hints.days, isKnown: hints.isKnown });
   if (src.kind === 'edgar-formd') return fetchFormD({ days: hints.days, isKnown: hints.isKnown });
   const headers = { 'User-Agent': UA, Accept: 'application/rss+xml, application/atom+xml, text/html, */*' };
   if (hints.validators?.etag) headers['If-None-Match'] = hints.validators.etag;

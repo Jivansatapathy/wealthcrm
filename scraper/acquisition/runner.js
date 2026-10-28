@@ -7,6 +7,7 @@ import { sha } from './normalize.js';
 import { DAY_MS } from './registry.js';
 import { applyRetention } from './leads.js';
 import { purgeVisitors } from './visitors.js';
+import { runMarketSource } from './google.js';
 
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = [1000, 4000];
@@ -82,6 +83,16 @@ export async function runSource(ctx, sourceId, { trigger = 'manual', actor = 'sy
   const nowIso = () => new Date(ctx.now()).toISOString();
   updateSourceState(ctx, sourceId, { last_attempted_fetch: nowIso() });
   try {
+    if (source.market) {
+      // Aggregate market signals (Google): stored separately, never converted into leads
+      const { received, added } = await runMarketSource(ctx, source);
+      run.received = received; run.accepted = added; run.duplicates = received - added;
+      const stm = ctx.store.get('source_state', {})[sourceId] || {};
+      updateSourceState(ctx, sourceId, { last_successful_fetch: nowIso(), consecutive_failures: 0, error_message: null,
+        records_received: (stm.records_received || 0) + received, records_accepted: (stm.records_accepted || 0) + added });
+      audit(ctx.store, { actor, action: 'source.run', entity: 'source', entityId: sourceId, detail: { run_id: run.run_id, received, accepted: added } }, ctx.now());
+      return finish('success');
+    }
     if (source.access_method === 'html') {
       const ok = await robotsAllows(source.source_url, ctx.fetchText);
       if (!ok) throw new Error('robots.txt disallows (or could not be read for) this URL');

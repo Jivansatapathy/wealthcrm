@@ -21,6 +21,13 @@ async function realFetchJson(url, body) {
   return res.json().catch(() => ({}));
 }
 
+async function realGoogleFetch(url, opts) {
+  const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(20000) });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Google API HTTP ${res.status}: ${body?.error?.message || body?.error_description || 'request failed'}`);
+  return body;
+}
+
 export function createContext(overrides = {}) {
   const env = overrides.env || process.env;
   const store = overrides.store || createStore(env.ACQ_DATA_DIR || DEFAULT_DATA_DIR);
@@ -31,6 +38,7 @@ export function createContext(overrides = {}) {
     fetchSource: realFetchSource,
     fetchText: realFetchText,
     fetchJson: realFetchJson,
+    googleFetch: realGoogleFetch,
     resolveMx: undefined, // default: node:dns
     customSources: () => [],
     crmData: null,

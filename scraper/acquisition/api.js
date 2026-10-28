@@ -10,6 +10,7 @@ import { recordVisit, recordVisitorConsent, visitorSummary } from './visitors.js
 import { listAdvisors, matchAdvisors, saveAdvisor } from './advisors.js';
 import { exportCsv, importCsv } from './csv.js';
 import { computeMetrics } from './metrics.js';
+import { marketSummary } from './google.js';
 import { audit, readAudit } from './audit.js';
 import { sha } from './normalize.js';
 
@@ -110,6 +111,7 @@ export function createApi(ctx) {
         need('sources.manage'); sensitive('test');
         const s = getSource(ctx, r[0]); if (!s) throw err('Unknown source', 404);
         if (s.connector !== 'implemented') throw err(`No connector is implemented for access method "${s.access_method}"`, 409);
+        if (s.market) throw err('Market-signal sources are checked with Refresh (it reports missing credentials); Test is for feeds', 409);
         if (s.access_method === 'html' && !(await robotsAllows(s.source_url, ctx.fetchText))) throw err('robots.txt disallows (or could not be read for) this URL', 409);
         try {
           const items = await ctx.fetchSource(fetchable(s));
@@ -224,6 +226,7 @@ export function createApi(ctx) {
       }
       if (method === 'GET' && path === '/acq/audit') { need('audit.read'); return json(res, 200, { audit: readAudit(ctx.store, { entityId: url.searchParams.get('entity_id') || undefined, limit: 300 }) }), true; }
       if (method === 'GET' && path === '/acq/visitors/summary') { need('metrics.read'); return json(res, 200, visitorSummary(ctx, Math.min(365, Math.max(1, Number(url.searchParams.get('days')) || 30)))), true; }
+      if (method === 'GET' && path === '/acq/market-signals') { need('metrics.read'); return json(res, 200, marketSummary(ctx)), true; }
       if (method === 'GET' && path === '/acq/metrics') { need('metrics.read'); return json(res, 200, computeMetrics(ctx, listSources(ctx))), true; }
 
       // import / export

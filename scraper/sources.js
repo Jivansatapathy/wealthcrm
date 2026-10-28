@@ -26,4 +26,6 @@ export const BUILTIN_SOURCES = [
   // directly; material-change disclosures reach us through the wires above. EDGAR is public.
   { id: 'edgar-13d', name: 'SEC EDGAR: Schedule 13D (activist / large holders)', kind: 'atom', category: 'Regulatory', reliability: 0.7, region: 'US',
     url: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=SC+13D&company=&dateb=&owner=include&start=0&count=40&output=atom' },
+  // Funding rounds from news and filings (needs MIDU_API_KEY; internal research use, attribution required)
+  { id: 'midu-funding-ca', name: 'Midu: Canadian funding rounds', kind: 'midu', category: 'Funding', reliability: 0.7, region: 'CA', url: 'https://midu.si/api' },
 ];

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ShieldCheck, Database, Users, ClipboardCheck, BarChart3, FileUp, Lock, RefreshCw, Play, Pause, PlugZap,
-  ExternalLink, CheckCircle2, XCircle, AlertTriangle, ChevronLeft, ChevronRight, Download, KeyRound, Inbox
+  ExternalLink, CheckCircle2, XCircle, AlertTriangle, ChevronLeft, ChevronRight, Download, KeyRound, Inbox, TrendingUp
 } from 'lucide-react';
 
 const API = '/api/acq';
@@ -236,7 +236,7 @@ function SourcesTab({ perms, setMsg, tick }) {
               <div className="acq-cell acq-btns">
                 <button className="btn btn-secondary btn-sm" onClick={() => setOpen({ ...open, [s.source_id]: open[s.source_id] === 'runs' ? null : 'runs' })}>Logs</button>
                 {manage && !s.system && <button className="btn btn-secondary btn-sm" onClick={() => setOpen({ ...open, [s.source_id]: open[s.source_id] === 'perm' ? null : 'perm' })}>Permission</button>}
-                {manage && s.connector === 'implemented' && <button className="btn btn-secondary btn-sm" aria-label={`Test ${s.source_name}`} onClick={() => act(s.source_id, 'test', (r) => (r.ok ? `Connection OK: ${r.items} items` : `Connection failed: ${r.error}`))}><PlugZap size={13} /> Test</button>}
+                {manage && s.connector === 'implemented' && !s.market && <button className="btn btn-secondary btn-sm" aria-label={`Test${s.source_name}`} onClick={() => act(s.source_id, 'test', (r) => (r.ok ? `Connection OK: ${r.items} items` : `Connection failed: ${r.error}`))}><PlugZap size={13} /> Test</button>}
                 {manage && s.connector === 'implemented' && <button className="btn btn-primary btn-sm" aria-label={`Refresh ${s.source_name}`} disabled={!s.permission.allowed} title={s.permission.allowed ? '' : 'Blocked by permission gate'} onClick={() => act(s.source_id, 'refresh', (r) => `Run ${r.run.status}: ${r.run.accepted} accepted, ${r.run.rejected} rejected${r.run.error ? ` (${r.run.error})` : ''}`)}><RefreshCw size={13} /> Refresh</button>}
                 {manage && s.connector === 'implemented' && <button className="btn btn-secondary btn-sm" onClick={() => act(s.source_id, s.paused ? 'resume' : 'pause', s.paused ? 'Resumed' : 'Paused')}>{s.paused ? <Play size={13} /> : <Pause size={13} />}</button>}
               </div>
@@ -308,7 +308,8 @@ function LeadDetail({ id, perms, setMsg, onChanged, onPromoteLead }) {
         <p>{l.evidence_excerpt}</p>
         <div className="acq-muted">Event {fmtDate(l.event_date)} · discovered {fmtDate(l.discovery_date)} · source {l.original_source_id} · confidence {Math.round((l.intent_confidence || 0) * 100)}% · hash {String(l.evidence_hash || '').slice(0, 10)}</div>
         {l.original_source_url && <a href={l.original_source_url} target="_blank" rel="noreferrer">Original source <ExternalLink size={12} /></a>}
-        {l.source_attributions?.length > 0 && <div className="acq-muted">Also reported by {l.source_attributions.length} other record(s)</div>}
+        {String(l.original_source_id || '').startsWith('midu') && <div className="acq-muted">Data: <a href="https://midu.si" target="_blank" rel="noreferrer">Midu (midu.si)</a>. Internal research use only; do not resell or redistribute.</div>}
+        {l.source_attributions?.length > 0 &&<div className="acq-muted">Also reported by {l.source_attributions.length} other record(s)</div>}
       </section>
 
       {l.related_persons?.length > 0 && (
@@ -574,6 +575,57 @@ function Analytics({ tick }) {
   );
 }
 
+/* ---------------- market signals (Google) ---------------- */
+function MarketSignals({ tick }) {
+  const [d, setD] = useState(null);
+  const [sources, setSources] = useState([]);
+  useEffect(() => {
+    api('/market-signals').then(setD).catch(() => setD(false));
+    api('/sources').then((r) => setSources(r.sources.filter((s) => s.market))).catch(() => {});
+  }, [tick]);
+  if (d === false) return <div className="acq-empty">Market signals are unavailable for your role.</div>;
+  if (!d) return <div className="acq-muted">Loading market signals…</div>;
+  const max = Math.max(1, ...d.topics.map((t) => t.search_volume));
+  return (
+    <div>
+      <div className="acq-note"><AlertTriangle size={14} /> {d.note} These numbers describe demand, not people: nobody here can be contacted, and they never become leads.</div>
+      <div className="acq-summary">
+        {sources.map((s) => (
+          <Pill key={s.source_id} tone={s.connected ? 'good' : s.permission.allowed ? 'warn' : 'muted'} title={s.error_message || s.permission.reasons?.join('; ') || s.authentication_requirements}>
+            {s.source_name.split(' (')[0]}: {s.connected ? `updated ${fmtDate(s.last_successful_fetch)}` : s.permission.allowed ? (s.error_message ? 'needs credentials' : 'approved, not run') : 'not approved'}
+          </Pill>
+        ))}
+      </div>
+      {d.rates?.length > 0 && (
+        <div className="acq-card"><h4>Rate environment (Bank of Canada)</h4>
+          {d.rates.map((r) => (
+            <div key={r.label} className="acq-bar"><span>{r.label}</span>
+              <strong>{r.rate_pct}%{r.change_4w_pts != null && r.change_4w_pts !== 0 ? ` (${r.change_4w_pts > 0 ? '+' : ''}${r.change_4w_pts} pts in 4 wks)` : ''}</strong></div>
+          ))}
+        </div>
+      )}
+      {d.topics.length === 0 ? (
+        <div className="acq-empty">No market data yet. Approve a Google source in the Sources tab (record its permission), set its credentials in the server environment, then press Refresh on it.</div>
+      ) : (
+        <div className="acq-table">
+          <div className="acq-row acq-muted"><div className="acq-cell grow">Topic</div><div className="acq-cell">Canada searches / month</div><div className="acq-cell small">3-month trend</div><div className="acq-cell small">Our site: impressions / clicks</div><div className="acq-cell small">Page views</div><div className="acq-cell small">Event sign-ups</div></div>
+          {d.topics.map((t) => (
+            <div key={t.topic} className="acq-row">
+              <div className="acq-cell grow"><strong>{label(t.topic)}</strong><div className="acq-bar" aria-hidden="true"><span style={{ display: 'block', height: 6, width: `${Math.round((t.search_volume / max) * 100)}%`, background: 'currentColor', opacity: 0.35, borderRadius: 3 }} /></div></div>
+              <div className="acq-cell">{t.search_volume ? t.search_volume.toLocaleString('en-CA') : 'n/a'}</div>
+              <div className="acq-cell small">{t.trend_pct == null ? 'n/a' : <Pill tone={t.trend_pct > 0 ? 'good' : t.trend_pct < 0 ? 'bad' : 'muted'}>{t.trend_pct > 0 ? '+' : ''}{t.trend_pct}%</Pill>}</div>
+              <div className="acq-cell small">{t.own_site_impressions || t.own_site_clicks ? `${t.own_site_impressions} / ${t.own_site_clicks}` : 'n/a'}</div>
+              <div className="acq-cell small">{t.page_views || 'n/a'}</div>
+              <div className="acq-cell small">{t.event_registrations || 'n/a'}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="acq-muted">Values shown as n/a have no data from that source yet. Keyword Planner volumes may be ranges on accounts without ad spend.</div>
+    </div>
+  );
+}
+
 /* ---------------- import / export ---------------- */
 function DataTab({ perms, setMsg }) {
   const [sources, setSources] = useState([]);
@@ -696,7 +748,7 @@ function CollectBar({ perms, setMsg, onCollected, tick }) {
 const TABS = [
   { id: 'sources', label: 'Sources', icon: Database }, { id: 'explorer', label: 'Lead Explorer', icon: Users },
   { id: 'review', label: 'Review Queue', icon: ClipboardCheck }, { id: 'records', label: 'Received Data', icon: Inbox }, { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { id: 'data', label: 'Import / Export', icon: FileUp },
+  { id: 'market', label: 'Market Signals', icon: TrendingUp }, { id: 'data', label: 'Import / Export', icon: FileUp },
 ];
 
 export default function LeadAcquisitionView({ onPromoteLead, showToast }) {
@@ -742,7 +794,8 @@ export default function LeadAcquisitionView({ onPromoteLead, showToast }) {
       {tab === 'review' && <ReviewQueue perms={perms} setMsg={setMsg} onPromoteLead={onPromoteLead} tick={tick} />}
       {tab === 'records' && <RecordsTab setMsg={setMsg} tick={tick} />}
       {tab === 'analytics' && <Analytics tick={tick} />}
-      {tab === 'data' && <DataTab perms={perms} setMsg={setMsg} />}
+      {tab === 'market' && <MarketSignals tick={tick} />}
+      {tab === 'data' &&<DataTab perms={perms} setMsg={setMsg} />}
     </div>
   );
 }
