@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { runScrape, isSafeUrl } from './pipeline.js';
 import { BUILTIN_SOURCES } from './sources.js';
 import { createContext, createApi, startScheduler } from './acquisition/index.js';
+import { createSalesBrainApi } from './sales-brain/api.js';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(DIR, 'data');
@@ -118,10 +119,15 @@ const readBody = (req) => new Promise((resolve) => { let b = ''; req.on('data', 
 // Lead-acquisition pipeline (permission-gated sources, consent, review). Routes live under /acq (proxied as /api/acq).
 const acqCtx = createContext({ customSources: () => readJson(CUSTOM_FILE, []), crmData: await loadCrm() });
 const acqApi = createApi(acqCtx);
+const salesBrainApi = createSalesBrainApi();
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (await acqApi(req, res, url)) return;
+  if (url.pathname.startsWith('/sales-brain')) {
+    const q = Object.fromEntries(url.searchParams.entries());
+    if (await salesBrainApi(req, res, url.pathname, q)) return;
+  }
   if (req.method === 'OPTIONS') return send(res, 204, {});
   try {
     if (url.pathname === '/health') return send(res, 200, { ok: true, updatedAt: state.updatedAt, scraping: !!running });

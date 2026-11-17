@@ -1,6 +1,6 @@
 import React from 'react';
 import { ENABLED_VIEWS } from '../views';
-import { Zap, BarChart3, Building2, RefreshCw, Bot, TrendingUp, Radar, ShieldCheck } from 'lucide-react';
+import { Zap, BarChart3, Building2, RefreshCw, Bot, TrendingUp, Radar, ShieldCheck, BrainCircuit } from 'lucide-react';
 
 export default function Sidebar({ currentView, setCurrentView, open, onClose, intentCount, pendingReferralCount, user }) {
   const allSections = [
@@ -12,6 +12,13 @@ export default function Sidebar({ currentView, setCurrentView, open, onClose, in
           label: "AI Intent Engine",
           icon: <Zap size={18} className="text-amber-400" />,
           badge: `${intentCount} Signals`,
+          isLive: true
+        },
+        {
+          id: "sales_brain",
+          label: "AI Sales Brain",
+          icon: <BrainCircuit size={18} className="text-purple-400" />,
+          badge: "Autonomous",
           isLive: true
         },
         {

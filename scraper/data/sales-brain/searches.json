@@ -1,0 +1,227 @@
+[
+  {
+    "id": "search-job-1794928711339",
+    "icpId": "icp-canadian-wealth",
+    "icpName": "Canadian Senior Professionals & Business Owners – Wealth Management",
+    "status": "PLANNED",
+    "trigger": "AI_ASSISTED",
+    "plan": {
+      "query": "Search for Canadian Senior Professionals & Business Owners – Wealth Management",
+      "filters": {
+        "company": {
+          "industries": [
+            "Legal Services",
+            "Higher Education & Research",
+            "Medical Practice",
+            "Health Care",
+            "Professional Services"
+          ],
+          "keywords": [
+            "private wealth",
+            "corporate class",
+            "estate planning",
+            "tax shielding",
+            "pension rollover",
+            "succession",
+            "capital gains"
+          ],
+          "employeeMin": 1,
+          "employeeMax": 500,
+          "locations": [
+            "Canada",
+            "Ontario",
+            "Quebec",
+            "British Columbia",
+            "Alberta",
+            "Nova Scotia",
+            "Saskatchewan",
+            "Manitoba"
+          ]
+        },
+        "contact": {
+          "titles": [
+            "Partner",
+            "Senior Partner",
+            "Managing Partner",
+            "Counsel",
+            "Professor Emeritus",
+            "Physician",
+            "Doctor",
+            "Owner",
+            "Founder",
+            "President"
+          ],
+          "seniorities": [
+            "owner",
+            "founder",
+            "partner",
+            "c_suite",
+            "senior",
+            "director"
+          ]
+        },
+        "segments": [
+          {
+            "key": "A",
+            "label": "Direct Intent: Wealth Advisory & Capital Structuring",
+            "signals": [
+              "DIRECT_INTENT"
+            ]
+          },
+          {
+            "key": "B",
+            "label": "Behavioural: Estate Freeze & Pension Rollover",
+            "signals": [
+              "BEHAVIOURAL_INTENT"
+            ]
+          },
+          {
+            "key": "C",
+            "label": "Event-Based: Business Sale & Corporate Realization",
+            "signals": [
+              "EVENT_ACQUISITION"
+            ]
+          },
+          {
+            "key": "D",
+            "label": "Senior Partners & Emeritus Faculty (Canada Priority)",
+            "signals": [
+              "RESEARCH_SURGE"
+            ]
+          }
+        ],
+        "outreach": {
+          "aiWrite": true,
+          "senderName": "Catherine Sinclair",
+          "senderCompany": "ScotiaMcLeod & Private Banking",
+          "address": "44 King St W, Toronto, ON M5H 1H1",
+          "link": "https://crm.venusglobaltech.com",
+          "sequenceDays": [
+            3,
+            7,
+            14
+          ]
+        }
+      }
+    },
+    "rationale": "Targeted Canadian professional search query formulated by AI Intent Brain.",
+    "page": 1,
+    "maxPages": 2,
+    "companiesFound": 24,
+    "peopleFound": 45,
+    "newLeads": 0,
+    "qualified": 0,
+    "revealed": 0,
+    "createdAt": "2026-11-17T15:18:31.339Z"
+  },
+  {
+    "id": "search-can-law-01",
+    "icpId": "icp-canadian-wealth",
+    "icpName": "Canadian Senior Professionals & Business Owners – Wealth Management",
+    "status": "COMPLETED",
+    "trigger": "MANUAL",
+    "plan": {
+      "query": "Partners and Managing Partners at Canadian Law Firms",
+      "filters": {
+        "industries": [
+          "Legal Services"
+        ],
+        "titles": [
+          "Partner",
+          "Senior Partner",
+          "Managing Partner",
+          "Counsel"
+        ],
+        "locations": [
+          "Ontario",
+          "Quebec",
+          "British Columbia",
+          "Alberta",
+          "Saskatchewan",
+          "Manitoba",
+          "Nova Scotia"
+        ]
+      }
+    },
+    "rationale": "High concentration of partner equity and professional corporation retained earnings.",
+    "page": 1,
+    "maxPages": 5,
+    "companiesFound": 48,
+    "peopleFound": 472,
+    "newLeads": 472,
+    "qualified": 472,
+    "revealed": 472,
+    "createdAt": "2026-11-05T09:00:00.000Z",
+    "finishedAt": "2026-11-05T09:12:00.000Z"
+  },
+  {
+    "id": "search-can-emeriti-02",
+    "icpId": "icp-canadian-wealth",
+    "icpName": "Canadian Senior Professionals & Business Owners – Wealth Management",
+    "status": "COMPLETED",
+    "trigger": "AUTOMATED",
+    "plan": {
+      "query": "Professors Emeriti across Canadian Universities",
+      "filters": {
+        "industries": [
+          "Higher Education & Research"
+        ],
+        "titles": [
+          "Professor Emeritus",
+          "Dean Emeritus",
+          "Emeritus Faculty"
+        ],
+        "locations": [
+          "Canada"
+        ]
+      }
+    },
+    "rationale": "High-pension academic retiree group with complex succession and endowment wealth planning requirements.",
+    "page": 1,
+    "maxPages": 3,
+    "companiesFound": 14,
+    "peopleFound": 259,
+    "newLeads": 259,
+    "qualified": 259,
+    "revealed": 259,
+    "createdAt": "2026-11-12T14:00:00.000Z",
+    "finishedAt": "2026-11-12T14:15:00.000Z"
+  },
+  {
+    "id": "search-can-med-03",
+    "icpId": "icp-canadian-wealth",
+    "icpName": "Canadian Senior Professionals & Business Owners – Wealth Management",
+    "status": "PLANNED",
+    "trigger": "AI_ASSISTED",
+    "plan": {
+      "query": "Medical Directors and Clinic Owners across Ontario and Western Canada",
+      "filters": {
+        "industries": [
+          "Medical Practice",
+          "Health Care",
+          "Clinics"
+        ],
+        "titles": [
+          "Medical Director",
+          "Clinic Owner",
+          "Physician",
+          "Specialist"
+        ],
+        "locations": [
+          "Ontario",
+          "British Columbia",
+          "Alberta"
+        ]
+      }
+    },
+    "rationale": "Planned pipeline expansion for MD Financial Management cross-divisional referrals.",
+    "page": 1,
+    "maxPages": 2,
+    "companiesFound": 28,
+    "peopleFound": 85,
+    "newLeads": 0,
+    "qualified": 0,
+    "revealed": 0,
+    "createdAt": "2026-11-17T17:00:00.000Z"
+  }
+]

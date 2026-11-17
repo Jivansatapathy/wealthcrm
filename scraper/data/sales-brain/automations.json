@@ -1,0 +1,38 @@
+[
+  {
+    "id": "auto-1",
+    "name": "Daily Canadian Professional Directory Sweep",
+    "icpId": "icp-canadian-wealth",
+    "icpName": "Canadian Senior Professionals & Business Owners – Wealth Management",
+    "schedule": "Every business day at 08:30 EST",
+    "status": "PAUSED",
+    "action": "Autonomous Apollo & Directory Search",
+    "dailyLimit": 35,
+    "lastRun": "2026-11-17T08:30:00.000Z",
+    "nextRun": "2026-11-18T08:30:00.000Z"
+  },
+  {
+    "id": "auto-2",
+    "name": "Weekly SEDAR+ & Regulatory Filing Monitor",
+    "icpId": "icp-canadian-wealth",
+    "icpName": "Canadian Senior Professionals & Business Owners – Wealth Management",
+    "schedule": "Every Monday at 09:00 EST",
+    "status": "ACTIVE",
+    "action": "Liquidity Event & Acquisition Flagging",
+    "dailyLimit": 25,
+    "lastRun": "2026-11-16T09:00:00.000Z",
+    "nextRun": "2026-11-23T09:00:00.000Z"
+  },
+  {
+    "id": "auto-3",
+    "name": "Autonomous AI Sequence Draft Generator",
+    "icpId": "icp-canadian-wealth",
+    "icpName": "Canadian Senior Professionals & Business Owners – Wealth Management",
+    "schedule": "Every business day at 10:00 EST",
+    "status": "ACTIVE",
+    "action": "Generate Step 1 & Step 2 Outreach Drafts",
+    "dailyLimit": 50,
+    "lastRun": "2026-11-17T10:00:00.000Z",
+    "nextRun": "2026-11-18T10:00:00.000Z"
+  }
+]

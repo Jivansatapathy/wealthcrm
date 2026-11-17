@@ -1,0 +1,47 @@
+[
+  {
+    "id": "evt-101",
+    "leadName": "Bradley Allen",
+    "company": "MLT Aikins LLP",
+    "type": "EMAIL_OPENED",
+    "detail": "Opened Step 1 outreach: 'Holding company tax sheltering for legal partners'",
+    "timestamp": "2026-11-17T16:20:00.000Z",
+    "scoreDelta": "+15 pts"
+  },
+  {
+    "id": "evt-102",
+    "leadName": "Ilona Bois-Drivet",
+    "company": "Langlois Lawyers LLP",
+    "type": "EMAIL_CLICKED",
+    "detail": "Clicked link: 'Canadian Corporate Class Tax Guide'",
+    "timestamp": "2026-11-17T15:45:00.000Z",
+    "scoreDelta": "+25 pts"
+  },
+  {
+    "id": "evt-103",
+    "leadName": "Abraham Boyarsky",
+    "company": "Concordia University",
+    "type": "EMAIL_OPENED",
+    "detail": "Opened Step 1 outreach: 'Post-retirement capital preservation & estate planning'",
+    "timestamp": "2026-11-17T14:10:00.000Z",
+    "scoreDelta": "+15 pts"
+  },
+  {
+    "id": "evt-104",
+    "leadName": "Yassir Alnaji",
+    "company": "MLT Aikins LLP",
+    "type": "EMAIL_SENT",
+    "detail": "Sent Step 1 executive introduction via ScotiaMcLeod Private Banking",
+    "timestamp": "2026-11-17T11:00:00.000Z",
+    "scoreDelta": "+5 pts"
+  },
+  {
+    "id": "evt-105",
+    "leadName": "Gordon Thompson",
+    "company": "San Lorenzo Gold Corp.",
+    "type": "MEETING_BOOKED",
+    "detail": "Booked 30-min discovery session with Catherine Sinclair",
+    "timestamp": "2026-11-17T09:30:00.000Z",
+    "scoreDelta": "+50 pts"
+  }
+]

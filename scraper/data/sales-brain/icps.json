@@ -1,0 +1,172 @@
+[
+  {
+    "id": "icp-canadian-wealth",
+    "name": "Canadian Senior Professionals & Business Owners – Wealth Management",
+    "description": "Senior doctors, lawyers, clinic owners, university professors emeriti, and business owners in Canada requiring private wealth management, holding company tax shielding, pension rollover, and estate planning.",
+    "offer": "Comprehensive wealth advisory, discretionary portfolio management, corporate class tax sheltering, Individual Pension Plans (IPPs), holding company restructuring, and Scotiatrust estate freezes.",
+    "vertical": "WEALTH_MANAGEMENT",
+    "isActive": true,
+    "searchMode": "REVIEW",
+    "autoSend": false,
+    "dailySendCap": 35,
+    "monthlyRevealBudget": 250,
+    "minScore": 70,
+    "criteria": {
+      "company": {
+        "industries": [
+          "Legal Services",
+          "Higher Education & Research",
+          "Medical Practice",
+          "Health Care",
+          "Professional Services"
+        ],
+        "keywords": [
+          "private wealth",
+          "corporate class",
+          "estate planning",
+          "tax shielding",
+          "pension rollover",
+          "succession",
+          "capital gains"
+        ],
+        "employeeMin": 1,
+        "employeeMax": 500,
+        "locations": [
+          "Canada",
+          "Ontario",
+          "Quebec",
+          "British Columbia",
+          "Alberta",
+          "Nova Scotia",
+          "Saskatchewan",
+          "Manitoba"
+        ]
+      },
+      "contact": {
+        "titles": [
+          "Partner",
+          "Senior Partner",
+          "Managing Partner",
+          "Counsel",
+          "Professor Emeritus",
+          "Physician",
+          "Doctor",
+          "Owner",
+          "Founder",
+          "President"
+        ],
+        "seniorities": [
+          "owner",
+          "founder",
+          "partner",
+          "c_suite",
+          "senior",
+          "director"
+        ]
+      },
+      "segments": [
+        {
+          "key": "A",
+          "label": "Direct Intent: Wealth Advisory & Capital Structuring",
+          "signals": [
+            "DIRECT_INTENT"
+          ]
+        },
+        {
+          "key": "B",
+          "label": "Behavioural: Estate Freeze & Pension Rollover",
+          "signals": [
+            "BEHAVIOURAL_INTENT"
+          ]
+        },
+        {
+          "key": "C",
+          "label": "Event-Based: Business Sale & Corporate Realization",
+          "signals": [
+            "EVENT_ACQUISITION"
+          ]
+        },
+        {
+          "key": "D",
+          "label": "Senior Partners & Emeritus Faculty (Canada Priority)",
+          "signals": [
+            "RESEARCH_SURGE"
+          ]
+        }
+      ],
+      "outreach": {
+        "aiWrite": true,
+        "senderName": "Catherine Sinclair",
+        "senderCompany": "ScotiaMcLeod & Private Banking",
+        "address": "44 King St W, Toronto, ON M5H 1H1",
+        "link": "https://crm.venusglobaltech.com",
+        "sequenceDays": [
+          3,
+          7,
+          14
+        ]
+      }
+    },
+    "weights": {
+      "location": 20,
+      "title": 25,
+      "seniority": 20,
+      "industry": 15,
+      "signals": 20
+    },
+    "createdAt": "2026-11-01T10:00:00.000Z",
+    "updatedAt": "2026-11-17T15:18:31.262Z"
+  },
+  {
+    "id": "icp-tech-founders",
+    "name": "Canadian Tech Founders & Early-Stage Executives",
+    "description": "High-growth tech founders, serial entrepreneurs, and venture-backed executives across Toronto, Vancouver, and Montreal experiencing liquidity milestones.",
+    "offer": "Discretionary cross-border wealth management, IPP pension design, and founder liquidity risk management.",
+    "vertical": "WEALTH_MANAGEMENT",
+    "isActive": true,
+    "searchMode": "AUTOMATED",
+    "autoSend": false,
+    "dailySendCap": 20,
+    "monthlyRevealBudget": 100,
+    "minScore": 75,
+    "criteria": {
+      "company": {
+        "industries": [
+          "Software & Internet",
+          "Information Technology",
+          "Fintech",
+          "Artificial Intelligence"
+        ],
+        "locations": [
+          "Toronto, ON",
+          "Vancouver, BC",
+          "Montréal, QC",
+          "Waterloo, ON"
+        ]
+      },
+      "contact": {
+        "titles": [
+          "Founder",
+          "Co-Founder",
+          "CEO",
+          "Chief Executive Officer",
+          "President"
+        ],
+        "seniorities": [
+          "owner",
+          "founder",
+          "c_suite"
+        ]
+      }
+    },
+    "weights": {
+      "location": 20,
+      "title": 30,
+      "seniority": 25,
+      "industry": 15,
+      "signals": 10
+    },
+    "createdAt": "2026-11-05T12:00:00.000Z",
+    "updatedAt": "2026-11-17T18:00:00.000Z"
+  }
+]

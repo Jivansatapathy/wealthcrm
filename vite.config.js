@@ -1,10 +1,28 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { createSalesBrainApi } from './scraper/sales-brain/api.js';
+
+const salesBrainApi = createSalesBrainApi();
 
 // Vite plugin to provide live Canadian market intelligence without CORS issues
 const liveMarketDataPlugin = () => ({
   name: 'live-market-data-plugin',
   configureServer(server) {
+    // Sales Brain API middleware directly inside Vite dev server
+    server.middlewares.use(async (req, res, next) => {
+      if (req.url && (req.url.startsWith('/api/sales-brain') || req.url.startsWith('/sales-brain'))) {
+        try {
+          const parsedUrl = new URL(req.url, 'http://localhost:3000');
+          const query = Object.fromEntries(parsedUrl.searchParams.entries());
+          const handled = await salesBrainApi(req, res, parsedUrl.pathname, query);
+          if (handled) return;
+        } catch (e) {
+          console.error('[Vite Sales Brain Plugin Error]:', e);
+        }
+      }
+      next();
+    });
+
     server.middlewares.use('/api/live-market-feed', async (req, res) => {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -125,6 +143,11 @@ export default defineConfig({
         target: 'http://localhost:3100',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api\/intent/, '')
+      },
+      '/api/sales-brain': {
+        target: 'http://localhost:3100',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api\/sales-brain/, '/sales-brain')
       }
     }
   },

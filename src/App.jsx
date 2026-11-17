@@ -5,6 +5,7 @@ import Header from './components/Header';
 import IntentEngineView from './components/IntentEngineView';
 import SourceIntelligenceView from './components/SourceIntelligenceView';
 import LeadAcquisitionView from './components/LeadAcquisitionView';
+import SalesBrainView from './components/SalesBrainView';
 import OpportunityPipelineView from './components/OpportunityPipelineView';
 import Client360View from './components/Client360View';
 import ReferralHubView from './components/ReferralHubView';
@@ -223,6 +224,10 @@ export default function App() {
 
           {currentView === 'acquisition' && (
             <LeadAcquisitionView onPromoteLead={handlePromoteLead} showToast={showToast} />
+          )}
+
+          {currentView === 'sales_brain' && (
+            <SalesBrainView showToast={showToast} />
           )}
 
           {currentView === 'pipeline' && (
