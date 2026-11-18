@@ -135,7 +135,7 @@ const server = http.createServer(async (req, res) => {
     if (await authApi(req, res, url.pathname)) return;
   }
   if (await acqApi(req, res, url)) return;
-  if (url.pathname.startsWith('/sales-brain')) {
+  if (url.pathname.startsWith('/sales-brain') || url.pathname.startsWith('/api/sales-brain')) {
     const q = Object.fromEntries(url.searchParams.entries());
     if (await salesBrainApi(req, res, url.pathname, q)) return;
   }

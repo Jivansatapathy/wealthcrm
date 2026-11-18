@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import IcpFormSheet from './IcpFormSheet';
 import {
   BrainCircuit, Sparkles, Rocket, Users, Mail, Clock, Activity, CalendarClock,
   LineChart, Plus, CheckCircle2, AlertTriangle, RefreshCw, X, Search,
@@ -198,25 +199,11 @@ export default function SalesBrainView({ showToast }) {
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [selectedDraftId, setSelectedDraftId] = useState(null);
   const [createIcpOpen, setCreateIcpOpen] = useState(false);
+  const [editingIcp, setEditingIcp] = useState(null);
   const [reviewingSearchJob, setReviewingSearchJob] = useState(null);
   const [customDraftLead, setCustomDraftLead] = useState(null);
   const [customSubject, setCustomSubject] = useState('');
   const [customBody, setCustomBody] = useState('');
-
-  // New ICP Form
-  const [newIcpForm, setNewIcpForm] = useState({
-    name: '',
-    description: '',
-    offer: '',
-    minScore: 70,
-    searchMode: 'REVIEW',
-    dailySendCap: 25,
-    monthlyRevealBudget: 100,
-    scheduleTime: '09:00',
-    industries: 'Legal Services, Higher Education, Private Banking',
-    titles: 'Partner, Managing Partner, Senior Counsel, Clinic Owner, Professor Emeritus',
-    locations: 'Ontario, British Columbia, Alberta, Quebec'
-  });
 
   const notify = (msg, type = 'info') => {
     if (showToast) showToast(msg, type);
@@ -325,6 +312,26 @@ export default function SalesBrainView({ showToast }) {
     }
   };
 
+  const [runningIcpId, setRunningIcpId] = useState(null);
+
+  const handleRunIcp = async (icpId) => {
+    setRunningIcpId(icpId);
+    try {
+      notify('Running Canadian prospect scraper & enrichment for ICP...', 'info');
+      const res = await fetchBrain(`/icps/${icpId}/run`, { method: 'POST' });
+      if (res && res.success) {
+        notify(`Scraped and added ${res.newLeadsCount} verified Canada-specific leads to database & CSV!`, 'success');
+        await loadAllData();
+      } else {
+        notify(res?.message || 'Search executed', 'info');
+      }
+    } catch (e) {
+      notify(`ICP run failed: ${e.message}`, 'error');
+    } finally {
+      setRunningIcpId(null);
+    }
+  };
+
   const handleStartSearch = async (reviewFirst) => {
     if (!searchRunIcp) return;
     try {
@@ -332,11 +339,12 @@ export default function SalesBrainView({ showToast }) {
         method: 'POST',
         body: { maxPages: Number(searchRunPages), reviewFirst }
       });
-      setSearches(prev => [job, ...prev]);
       if (reviewFirst && job.status === 'PLANNED') {
+        setSearches(prev => [job, ...prev]);
         setReviewingSearchJob(job);
       } else {
-        notify('Search run started successfully', 'success');
+        notify('Search completed and new Canadian leads ingested!', 'success');
+        await loadAllData();
       }
     } catch (e) {
       notify(e.message, 'error');
@@ -346,44 +354,11 @@ export default function SalesBrainView({ showToast }) {
   const handleApproveSearchJob = async (searchId) => {
     try {
       const res = await fetchBrain(`/searches/${searchId}/approve`, { method: 'POST' });
-      setSearches(prev => prev.map(s => s.id === searchId ? res.search : s));
-      notify('Search approved and executed', 'success');
+      notify(`Search approved! Ingested ${res.newLeadsCount || 0} Canadian prospects.`, 'success');
       setReviewingSearchJob(null);
+      await loadAllData();
     } catch (e) {
       notify(e.message, 'error');
-    }
-  };
-
-  const handleCreateIcp = async (e) => {
-    e.preventDefault();
-    try {
-      const newIcp = await fetchBrain('/icps', {
-        method: 'POST',
-        body: {
-          name: newIcpForm.name,
-          description: newIcpForm.description,
-          offer: newIcpForm.offer,
-          minScore: Number(newIcpForm.minScore),
-          searchMode: newIcpForm.searchMode,
-          dailySendCap: Number(newIcpForm.dailySendCap),
-          monthlyRevealBudget: Number(newIcpForm.monthlyRevealBudget),
-          scheduleTime: newIcpForm.scheduleTime,
-          criteria: {
-            company: {
-              industries: newIcpForm.industries.split(',').map(s => s.trim()).filter(Boolean),
-              locations: newIcpForm.locations.split(',').map(s => s.trim()).filter(Boolean)
-            },
-            contact: {
-              titles: newIcpForm.titles.split(',').map(s => s.trim()).filter(Boolean)
-            }
-          }
-        }
-      });
-      setIcps(prev => [newIcp, ...prev]);
-      notify(`ICP "${newIcp.name}" created`, 'success');
-      setCreateIcpOpen(false);
-    } catch (err) {
-      notify(err.message, 'error');
     }
   };
 
@@ -551,7 +526,13 @@ export default function SalesBrainView({ showToast }) {
             <button className="sb-vertical-btn">🏢 Corporate Holdco</button>
             <button className="sb-vertical-btn">🌐 All</button>
           </div>
-          <button className="sb-btn sb-btn-primary" onClick={() => setCreateIcpOpen(true)}>
+          <button
+            className="sb-btn sb-btn-primary"
+            onClick={() => {
+              setEditingIcp(null);
+              setCreateIcpOpen(true);
+            }}
+          >
             <Plus size={14} /> Create ICP
           </button>
           <button className="sb-btn sb-btn-outline" onClick={() => setActiveTab('automations')}>
@@ -565,9 +546,9 @@ export default function SalesBrainView({ showToast }) {
         <div className="sb-tabs-list">
           {[
             { id: 'command', label: 'Command Center', icon: Zap, color: 'text-cyan-400' },
-            { id: 'follow-ups', label: 'Follow-Ups & Outcomes', icon: Clock, color: 'text-indigo-400' },
-            { id: 'engagement', label: 'Engagement & Hot Leads', icon: Activity, color: 'text-rose-400' },
-            { id: 'automations', label: 'Automations & Schedules', icon: CalendarClock, color: 'text-amber-400' },
+            { id: 'follow-ups', label: 'Follow-Ups', icon: Clock, color: 'text-indigo-400' },
+            { id: 'engagement', label: 'Engagement', icon: Activity, color: 'text-rose-400' },
+            { id: 'automations', label: 'Automations', icon: CalendarClock, color: 'text-amber-400' },
             { id: 'icps', label: `ICPs (${icps.length})`, icon: Users },
             { id: 'searches', label: `Searches (${searches.length})`, icon: Search },
             { id: 'leads', label: `Leads (${leads.length})`, icon: Users },
@@ -644,7 +625,13 @@ export default function SalesBrainView({ showToast }) {
           {/* Action Toolbar (Gentle CRM Replica) */}
           <div className="sb-action-toolbar">
             <div className="sb-toolbar-group">
-              <button className="sb-btn-primary-action" onClick={() => setCreateIcpOpen(true)}>
+              <button
+                className="sb-btn-primary-action"
+                onClick={() => {
+                  setEditingIcp(null);
+                  setCreateIcpOpen(true);
+                }}
+              >
                 <Plus size={14} /> New ICP Profile
               </button>
               <button className="sb-btn-secondary-action" onClick={() => setActiveTab('searches')}>
@@ -679,7 +666,7 @@ export default function SalesBrainView({ showToast }) {
                     <Flame size={16} className="text-rose-500" />
                     <span>High-Intent Leads Spotlight</span>
                   </div>
-                  <button className="text-xs text-slate-400 hover:text-white transition-colors" onClick={() => setActiveTab('engagement')}>
+                  <button className="sb-btn-inline-link" onClick={() => setActiveTab('engagement')}>
                     View all ({hotLeads.length})
                   </button>
                 </div>
@@ -773,7 +760,7 @@ export default function SalesBrainView({ showToast }) {
                   </span>
                   <button
                     onClick={() => setActiveTab('follow-ups')}
-                    className="text-xs text-indigo-400 hover:underline font-medium"
+                    className="sb-btn-inline-link sb-btn-inline-indigo"
                   >
                     View Hub →
                   </button>
@@ -866,11 +853,11 @@ export default function SalesBrainView({ showToast }) {
       {activeTab === 'follow-ups' && (
         <div className="space-y-4">
           <div className="sb-filter-bar">
-            <div className="relative flex-1 min-w-[220px] max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 size-4 text-slate-500" />
+            <div className="sb-search-input-wrap" style={{ minWidth: 260, maxWidth: 360 }}>
+              <Search className="sb-search-input-icon" />
               <input
                 type="text"
-                className="sb-input pl-8 w-full"
+                className="sb-search-input-field"
                 placeholder="Search prospect, company..."
                 value={fuQuery}
                 onChange={e => setFuQuery(e.target.value)}
@@ -901,7 +888,7 @@ export default function SalesBrainView({ showToast }) {
           </div>
 
           <div className="sb-table-wrap">
-            <table className="sb-clean-table">
+            <table className="sb-clean-table sb-clean-table-followups">
               <thead>
                 <tr>
                   <th>Contact</th>
@@ -915,39 +902,43 @@ export default function SalesBrainView({ showToast }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredFollowups.map(fu => (
-                  <tr key={fu.id}>
-                    <td className="font-semibold text-white">{fu.contactName}</td>
-                    <td className="text-slate-300">{fu.company}</td>
-                    <td>
-                      <span className={`sb-badge ${fu.temperature === 'HOT' ? 'sb-badge-bad' : fu.temperature === 'WARM' ? 'sb-badge-warn' : 'sb-badge-info'}`}>
-                        {fu.temperature}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-slate-300 text-xs tabular-nums">
-                        {fu.opens || 2} opens, {fu.clicks || 1} clicks
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`sb-badge ${fu.status === 'COMPLETED' ? 'sb-badge-good' : 'sb-badge-warn'}`}>
-                        {fu.status}
-                      </span>
-                    </td>
-                    <td className="text-slate-400 whitespace-nowrap">{fmtDate(fu.dueAt)}</td>
-                    <td>
-                      <span className="sb-badge sb-badge-info text-[10px]">{fu.outcome || 'PENDING_DISPATCH'}</span>
-                    </td>
-                    <td className="text-right">
-                      <button
-                        className="sb-btn sb-btn-outline sb-btn-xs gap-1"
-                        onClick={() => handleDismissFollowup(fu.id)}
-                      >
-                        <CheckCircle2 size={12} className="text-emerald-400" /> Resolve
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredFollowups.map(fu => {
+                  const leadName = fu.leadName || fu.contactName || fu.name || 'Executive Contact';
+                  const temp = fu.temperature || fu.tier || (fu.score >= 80 ? 'HOT' : fu.score >= 60 ? 'WARM' : 'NURTURE');
+                  return (
+                    <tr key={fu.id}>
+                      <td className="font-semibold text-white whitespace-nowrap">{leadName}</td>
+                      <td className="text-slate-300">{fu.company || fu.companyName || 'MLT Aikins LLP'}</td>
+                      <td>
+                        <span className={`sb-badge ${temp === 'HOT' ? 'sb-badge-bad' : temp === 'WARM' ? 'sb-badge-warn' : 'sb-badge-info'}`}>
+                          {temp}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="text-slate-300 text-xs tabular-nums">
+                          {fu.opens || 2} opens, {fu.clicks || 1} clicks
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`sb-badge ${fu.status === 'COMPLETED' ? 'sb-badge-good' : 'sb-badge-warn'}`}>
+                          {fu.status || 'PENDING'}
+                        </span>
+                      </td>
+                      <td className="text-slate-400 whitespace-nowrap">{fmtDate(fu.dueAt)}</td>
+                      <td>
+                        <span className="sb-badge sb-badge-info text-[10px]">{fu.outcome || 'PENDING_DISPATCH'}</span>
+                      </td>
+                      <td className="text-right">
+                        <button
+                          className="sb-btn sb-btn-outline sb-btn-xs gap-1"
+                          onClick={() => handleDismissFollowup(fu.id)}
+                        >
+                          <CheckCircle2 size={12} className="text-emerald-400" /> Resolve
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -960,15 +951,15 @@ export default function SalesBrainView({ showToast }) {
       {activeTab === 'engagement' && (
         <div className="space-y-6">
           {/* Subtab Toggle */}
-          <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+          <div className="sb-subtab-bar">
             <button
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${engSubTab === 'overview' ? 'bg-indigo-500/15 text-indigo-400' : 'text-slate-400 hover:text-white'}`}
+              className={`sb-subtab-btn ${engSubTab === 'overview' ? 'active' : ''}`}
               onClick={() => setEngSubTab('overview')}
             >
               Engagement Overview
             </button>
             <button
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${engSubTab === 'hot-leads' ? 'bg-indigo-500/15 text-indigo-400' : 'text-slate-400 hover:text-white'}`}
+              className={`sb-subtab-btn ${engSubTab === 'hot-leads' ? 'active' : ''}`}
               onClick={() => setEngSubTab('hot-leads')}
             >
               Hot Leads Spotlight ({hotLeads.length})
@@ -1109,7 +1100,7 @@ export default function SalesBrainView({ showToast }) {
           </div>
 
           <div className="sb-table-wrap">
-            <table className="sb-clean-table">
+            <table className="sb-clean-table sb-clean-table-automations">
               <thead>
                 <tr>
                   <th>ICP Name</th>
@@ -1185,17 +1176,23 @@ export default function SalesBrainView({ showToast }) {
          ========================================================================= */}
       {activeTab === 'icps' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-400">
+          <div className="sb-section-header-row">
+            <p className="sb-section-desc">
               Ideal customer profiles that searches and scoring run against.
             </p>
-            <button className="sb-btn sb-btn-primary gap-1.5" onClick={() => setCreateIcpOpen(true)}>
+            <button
+              className="sb-btn sb-btn-primary gap-1.5"
+              onClick={() => {
+                setEditingIcp(null);
+                setCreateIcpOpen(true);
+              }}
+            >
               <Plus size={15} /> New ICP
             </button>
           </div>
 
           <div className="sb-table-wrap">
-            <table className="sb-clean-table">
+            <table className="sb-clean-table sb-clean-table-icps">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -1232,25 +1229,31 @@ export default function SalesBrainView({ showToast }) {
                       </span>
                     </td>
                     <td className="tabular-nums font-semibold text-white">
-                      {icp._count?.leads ?? (icp.id === 'icp-canadian-wealth' ? 738 : 0)}
+                      {icp._count?.leads ?? 0}
                     </td>
                     <td className="tabular-nums text-slate-300">
-                      {icp._count?.jobs ?? (icp.id === 'icp-canadian-wealth' ? 3 : 0)}
+                      {icp._count?.jobs ?? 0}
                     </td>
                     <td className="text-xs text-slate-400 whitespace-nowrap">
-                      {fmtDate(icp.lastRunAt || '2026-11-17T14:15:00.000Z')}
+                      {fmtDate(icp.lastRunAt)}
                     </td>
                     <td>
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="sb-table-actions">
                         <button
                           className="sb-btn sb-btn-outline sb-btn-xs gap-1"
-                          title="Run Search"
-                          onClick={() => {
-                            setSearchRunIcp(icp.id);
-                            setActiveTab('searches');
-                          }}
+                          title="Run ICP Scraper"
+                          disabled={runningIcpId === icp.id}
+                          onClick={() => handleRunIcp(icp.id)}
                         >
-                          <Rocket size={13} className="text-indigo-400" /> Run
+                          {runningIcpId === icp.id ? (
+                            <>
+                              <Loader2 size={13} className="animate-spin text-indigo-400" /> Scraping...
+                            </>
+                          ) : (
+                            <>
+                              <Rocket size={13} className="text-indigo-400" /> Run
+                            </>
+                          )}
                         </button>
                         <button
                           className="sb-btn sb-btn-outline sb-btn-xs gap-1"
@@ -1265,19 +1268,7 @@ export default function SalesBrainView({ showToast }) {
                           className="sb-btn sb-btn-ghost sb-btn-icon"
                           title="Edit Profile"
                           onClick={() => {
-                            setNewIcpForm({
-                              name: icp.name,
-                              description: icp.description || '',
-                              offer: icp.offer || '',
-                              minScore: icp.minScore || 70,
-                              searchMode: icp.searchMode || 'REVIEW',
-                              dailySendCap: icp.dailySendCap || 25,
-                              monthlyRevealBudget: icp.monthlyRevealBudget || 100,
-                              scheduleTime: icp.scheduleTime || '09:00',
-                              industries: 'Legal Services, Higher Education, Private Banking',
-                              titles: 'Partner, Senior Counsel, Clinic Owner',
-                              locations: 'Canada'
-                            });
+                            setEditingIcp(icp);
                             setCreateIcpOpen(true);
                           }}
                         >
@@ -1299,10 +1290,10 @@ export default function SalesBrainView({ showToast }) {
       {activeTab === 'searches' && (
         <div className="space-y-5">
           {/* Top Search Runner Card */}
-          <div className="sb-card-panel p-4 space-y-3">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1.5 min-w-[220px] flex-1 max-w-sm">
-                <label className="text-xs font-semibold text-slate-300 block">ICP</label>
+          <div className="sb-search-runner-box">
+            <div className="sb-search-runner-bar">
+              <div className="sb-search-field-icp">
+                <label className="sb-search-field-label">ICP</label>
                 <select
                   className="sb-select w-full"
                   value={searchRunIcp}
@@ -1316,8 +1307,8 @@ export default function SalesBrainView({ showToast }) {
                 </select>
               </div>
 
-              <div className="space-y-1.5 w-28">
-                <label className="text-xs font-semibold text-slate-300 block">Pages</label>
+              <div className="sb-search-field-pages">
+                <label className="sb-search-field-label">Pages</label>
                 <select
                   className="sb-select w-full"
                   value={searchRunPages}
@@ -1345,7 +1336,7 @@ export default function SalesBrainView({ showToast }) {
                 <Play size={14} /> Run now
               </button>
             </div>
-            <p className="text-[11px] text-slate-400">
+            <p className="sb-search-hint">
               Searching Apollo's people database is free. Revealing emails spends credits, within each ICP's monthly budget.
             </p>
           </div>
@@ -1354,7 +1345,7 @@ export default function SalesBrainView({ showToast }) {
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-white">History</h2>
             <div className="sb-table-wrap">
-              <table className="sb-clean-table">
+              <table className="sb-clean-table sb-clean-table-searches">
                 <thead>
                   <tr>
                     <th>ICP</th>
@@ -1380,17 +1371,17 @@ export default function SalesBrainView({ showToast }) {
                         )}
                       </td>
                       <td>
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
-                          <span><strong className="text-white">{j.companiesFound || 0}</strong> <span className="text-slate-400">companies</span></span>
-                          <span><strong className="text-white">{j.peopleFound || 0}</strong> <span className="text-slate-400">people</span></span>
-                          <span><strong className="text-white">{j.newLeads || 0}</strong> <span className="text-slate-400">new</span></span>
-                          <span><strong className="text-white">{j.qualified || 0}</strong> <span className="text-slate-400">qualified</span></span>
-                          <span><strong className="text-white">{j.revealed || 0}</strong> <span className="text-slate-400">revealed</span></span>
+                        <div className="sb-history-results">
+                          <span><strong>{j.companiesFound || 0}</strong> <span>companies</span></span>
+                          <span><strong>{j.peopleFound || 0}</strong> <span>people</span></span>
+                          <span><strong>{j.newLeads || 0}</strong> <span>new</span></span>
+                          <span><strong>{j.qualified || 0}</strong> <span>qualified</span></span>
+                          <span><strong>{j.revealed || 0}</strong> <span>revealed</span></span>
                         </div>
                       </td>
                       <td className="text-xs text-slate-400 whitespace-nowrap">{fmtDate(j.createdAt)}</td>
                       <td className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="sb-table-actions">
                           {j.status === 'PLANNED' && (
                             <button
                               className="sb-btn sb-btn-outline sb-btn-xs"
@@ -1424,20 +1415,20 @@ export default function SalesBrainView({ showToast }) {
       {activeTab === 'leads' && (
         <div className="space-y-4">
           {/* Filter Bar */}
-          <div className="sb-filter-bar">
-            <div className="relative flex-1 min-w-[220px] max-w-xs">
-              <Search className="absolute left-2.5 top-2.5 size-4 text-slate-500" />
+          <div className="sb-leads-toolbar">
+            <div className="sb-search-input-wrap">
+              <Search className="sb-search-input-icon" />
               <input
                 type="text"
-                className="sb-input pl-8 w-full"
-                placeholder="Search name, company, title"
+                className="sb-search-input-field"
+                placeholder="Search name, company, title..."
                 value={leadQuery}
                 onChange={e => { setLeadQuery(e.target.value); setLeadPage(1); }}
               />
             </div>
 
             <select
-              className="sb-select w-[180px]"
+              className="sb-select sb-select-icp"
               value={leadIcpFilter}
               onChange={e => { setLeadIcpFilter(e.target.value); setLeadPage(1); }}
             >
@@ -1448,7 +1439,7 @@ export default function SalesBrainView({ showToast }) {
             </select>
 
             <select
-              className="sb-select w-[190px]"
+              className="sb-select sb-select-status"
               value={leadStatusFilter}
               onChange={e => { setLeadStatusFilter(e.target.value); setLeadPage(1); }}
             >
@@ -1466,14 +1457,14 @@ export default function SalesBrainView({ showToast }) {
               type="number"
               min="0"
               max="100"
-              className="sb-input w-28"
+              className="sb-input sb-input-score"
               placeholder="Min score"
               value={leadMinScore}
               onChange={e => { setLeadMinScore(e.target.value); setLeadPage(1); }}
             />
 
             <select
-              className="sb-select w-40"
+              className="sb-select sb-select-sort"
               value={leadSort}
               onChange={e => { setLeadSort(e.target.value); setLeadPage(1); }}
             >
@@ -1485,7 +1476,7 @@ export default function SalesBrainView({ showToast }) {
 
           {/* Table */}
           <div className="sb-table-wrap">
-            <table className="sb-clean-table">
+            <table className="sb-clean-table sb-clean-table-leads">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -1506,20 +1497,20 @@ export default function SalesBrainView({ showToast }) {
                     className="clickable"
                     onClick={() => setSelectedLeadId(l.id)}
                   >
-                    <td className="font-medium text-sm text-white whitespace-nowrap">
+                    <td className="font-semibold text-sm text-white whitespace-nowrap">
                       {[l.firstName, l.lastName].filter(Boolean).join(' ') || 'Unknown'}
                     </td>
-                    <td className="text-xs text-slate-300 max-w-[200px] truncate">{l.title || '-'}</td>
+                    <td className="text-xs text-slate-300 max-w-[200px] truncate whitespace-nowrap">{l.title || '-'}</td>
                     <td>
-                      <p className="text-sm text-white font-medium">{l.companyName || '-'}</p>
+                      <p className="text-sm text-white font-medium whitespace-nowrap">{l.companyName || '-'}</p>
                       {l.companyDomain && (
                         <p className="text-[11px] text-slate-400">{l.companyDomain}</p>
                       )}
                     </td>
-                    <td className="text-xs text-slate-300">
+                    <td className="text-xs text-slate-300 whitespace-nowrap">
                       {l.email || <span className="text-slate-500">Not revealed</span>}
                     </td>
-                    <td className="text-xs text-slate-400 max-w-[160px] truncate">
+                    <td className="text-xs text-slate-400 whitespace-nowrap">
                       {l.location || '-'}
                     </td>
                     <td className="text-xs text-slate-300 whitespace-nowrap">
@@ -1529,10 +1520,10 @@ export default function SalesBrainView({ showToast }) {
                       <ScoreBar score={l.score} />
                     </td>
                     <td>
-                      <div className="flex items-center gap-1.5">
+                      <div className="sb-status-tier-cell">
                         <LeadStatusBadge status={l.status} />
                         {l.tier && (
-                          <span className="rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">
+                          <span className="sb-tier-pill">
                             {l.tier}
                           </span>
                         )}
@@ -1578,69 +1569,73 @@ export default function SalesBrainView({ showToast }) {
          ========================================================================= */}
       {activeTab === 'outreach' && (
         <div className="space-y-4">
-          {/* Filter Bar */}
-          <div className="sb-filter-bar">
-            <select
-              className="sb-select w-[180px]"
-              value={draftIcpFilter}
-              onChange={e => { setDraftIcpFilter(e.target.value); setDraftPage(1); }}
-            >
-              <option value="__all">All ICPs</option>
-              {icps.map(i => (
-                <option key={i.id} value={i.id}>{i.name}</option>
-              ))}
-            </select>
+          {/* Filter & Action Toolbar */}
+          <div className="sb-outreach-toolbar">
+            <div className="sb-outreach-toolbar-top">
+              <select
+                className="sb-select w-[180px]"
+                value={draftIcpFilter}
+                onChange={e => { setDraftIcpFilter(e.target.value); setDraftPage(1); }}
+              >
+                <option value="__all">All ICPs</option>
+                {icps.map(i => (
+                  <option key={i.id} value={i.id}>{i.name}</option>
+                ))}
+              </select>
 
-            <select
-              className="sb-select w-[200px]"
-              value={draftStatusFilter}
-              onChange={e => { setDraftStatusFilter(e.target.value); setDraftPage(1); }}
-            >
-              <option value="__all">All statuses</option>
-              <option value="PENDING_APPROVAL">Pending Approval</option>
-              <option value="APPROVED">Approved</option>
-              <option value="SENT">Sent</option>
-              <option value="FAILED">Failed</option>
-              <option value="REJECTED">Rejected</option>
-            </select>
+              <select
+                className="sb-select w-[190px]"
+                value={draftStatusFilter}
+                onChange={e => { setDraftStatusFilter(e.target.value); setDraftPage(1); }}
+              >
+                <option value="__all">All statuses</option>
+                <option value="PENDING_APPROVAL">Pending Approval</option>
+                <option value="APPROVED">Approved</option>
+                <option value="SENT">Sent</option>
+                <option value="FAILED">Failed</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
 
-            <input
-              type="date"
-              className="sb-input w-40"
-              value={draftDateFilter}
-              onChange={e => { setDraftDateFilter(e.target.value); setDraftPage(1); }}
-            />
+              <input
+                type="date"
+                className="sb-input w-36"
+                value={draftDateFilter}
+                onChange={e => { setDraftDateFilter(e.target.value); setDraftPage(1); }}
+              />
 
-            <button
-              className="sb-btn sb-btn-primary"
-              disabled={!pendingDraftsCount}
-              onClick={handleApproveAllDrafts}
-            >
-              Approve all pending ({pendingDraftsCount})
-            </button>
+              <button
+                className="sb-btn sb-btn-primary"
+                disabled={!pendingDraftsCount}
+                onClick={handleApproveAllDrafts}
+              >
+                Approve all pending ({pendingDraftsCount})
+              </button>
+            </div>
 
-            <button
-              className="sb-btn sb-btn-outline gap-1.5"
-              onClick={loadAllData}
-            >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Re-run skipped and not written
-            </button>
-            <span className="text-xs text-slate-500 ml-auto">Refreshes every 10 seconds.</span>
+            <div className="sb-outreach-toolbar-bottom">
+              <button
+                className="sb-btn sb-btn-outline gap-1.5"
+                onClick={loadAllData}
+              >
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Re-run skipped and not written
+              </button>
+              <span className="text-xs text-slate-500">Refreshes every 10 seconds.</span>
+            </div>
           </div>
 
           {/* Table */}
           <div className="sb-table-wrap">
-            <table className="sb-clean-table">
+            <table className="sb-clean-table sb-clean-table-outreach">
               <thead>
                 <tr>
-                  <th>Lead</th>
-                  <th>Company</th>
-                  <th>To</th>
-                  <th>Subject</th>
-                  <th>Status</th>
-                  <th>Sent?</th>
-                  <th>Reason / why</th>
-                  <th>Created</th>
+                  <th className="sb-col-lead">Lead</th>
+                  <th className="sb-col-company">Company</th>
+                  <th className="sb-col-email">To</th>
+                  <th className="sb-col-subject">Subject</th>
+                  <th className="sb-col-status">Status</th>
+                  <th className="sb-col-sent">Sent?</th>
+                  <th className="sb-col-reason">Reason / why</th>
+                  <th className="sb-col-created">Created</th>
                 </tr>
               </thead>
               <tbody>
@@ -1650,26 +1645,36 @@ export default function SalesBrainView({ showToast }) {
                     className="clickable"
                     onClick={() => setSelectedDraftId(d.id)}
                   >
-                    <td className="font-medium text-sm text-white whitespace-nowrap">
-                      {d.leadName || 'Canadian Senior Executive'}
-                      <p className="text-[11px] font-normal text-slate-400">{d.icpName || 'Canadian Wealth'}</p>
+                    <td className="sb-col-lead">
+                      <p className="font-semibold text-sm text-white leading-tight">
+                        {d.leadName || (d.brainLead ? `${d.brainLead.firstName || ''} ${d.brainLead.lastName || ''}`.trim() : '') || (leads.find(l => l.id === d.brainLeadId)?.name) || 'Executive Contact'}
+                      </p>
+                      <p className="text-[11px] font-normal text-slate-400 mt-0.5">
+                        {d.icpName || (icps.find(i => i.id === d.icpId)?.name) || 'Canadian Wealth'}
+                      </p>
                     </td>
-                    <td className="text-sm text-slate-300">{d.companyName || '-'}</td>
-                    <td className="text-xs text-slate-400">{d.toEmail || 'Revealed on send'}</td>
-                    <td className="text-xs text-slate-200 max-w-[240px] truncate">{d.subject || '-'}</td>
-                    <td>
+                    <td className="sb-col-company text-sm text-slate-300">
+                      {d.companyName || d.brainLead?.companyName || (leads.find(l => l.id === d.brainLeadId)?.companyName) || '-'}
+                    </td>
+                    <td className="sb-col-email text-xs text-slate-400">
+                      {d.toEmail || d.brainLead?.email || <span className="text-slate-500">Revealed on send</span>}
+                    </td>
+                    <td className="sb-col-subject text-xs text-slate-200">
+                      {d.subject || '-'}
+                    </td>
+                    <td className="sb-col-status">
                       <DraftStatusBadge status={d.status} />
                     </td>
-                    <td className="text-xs max-w-[200px]">
+                    <td className="sb-col-sent text-xs">
                       <p className={`font-medium ${d.status === 'SENT' ? 'text-emerald-400' : 'text-slate-400'}`}>
                         {d.status === 'SENT' ? 'Sent' : d.status === 'APPROVED' ? 'Queued to send' : 'Waiting for approval'}
                       </p>
-                      {d.sentAt && <span className="text-slate-500 text-[10px]">{fmtDate(d.sentAt)}</span>}
+                      {d.sentAt && <span className="text-slate-500 text-[10px] block mt-0.5">{fmtDate(d.sentAt)}</span>}
                     </td>
-                    <td className="text-xs text-slate-400 max-w-[260px] truncate">
+                    <td className="sb-col-reason text-xs text-slate-400">
                       {d.selectionReason || 'High match with target Canadian Wealth ICP'}
                     </td>
-                    <td className="text-xs text-slate-400 whitespace-nowrap">
+                    <td className="sb-col-created text-xs text-slate-400">
                       {fmtDate(d.createdAt)}
                     </td>
                   </tr>
@@ -1960,8 +1965,13 @@ export default function SalesBrainView({ showToast }) {
             <div className="sb-sheet-header">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="sb-sheet-title">{selectedDraft.leadName || 'Recipient'}</h3>
-                  <p className="sb-sheet-desc">To: {selectedDraft.toEmail || 'Verified Corporate Email'}</p>
+                  <h3 className="sb-sheet-title">
+                    {selectedDraft.leadName || (selectedDraft.brainLead ? `${selectedDraft.brainLead.firstName || ''} ${selectedDraft.brainLead.lastName || ''}`.trim() : '') || (leads.find(l => l.id === selectedDraft.brainLeadId)?.name) || 'Recipient'}
+                  </h3>
+                  <p className="sb-sheet-desc">
+                    To: {selectedDraft.toEmail || selectedDraft.brainLead?.email || 'Verified Corporate Email'}
+                    {(selectedDraft.companyName || selectedDraft.brainLead?.companyName || (leads.find(l => l.id === selectedDraft.brainLeadId)?.companyName)) ? ` · ${selectedDraft.companyName || selectedDraft.brainLead?.companyName || (leads.find(l => l.id === selectedDraft.brainLeadId)?.companyName)}` : ''}
+                  </p>
                 </div>
                 <button className="sb-btn sb-btn-ghost sb-btn-icon" onClick={() => setSelectedDraftId(null)}>
                   <X size={16} />
@@ -1969,7 +1979,9 @@ export default function SalesBrainView({ showToast }) {
               </div>
               <div className="flex items-center gap-2 pt-2">
                 <DraftStatusBadge status={selectedDraft.status} />
-                <span className="text-xs text-slate-400">ICP: {selectedDraft.icpName || 'Canadian Wealth'}</span>
+                <span className="text-xs text-slate-400">
+                  ICP: {selectedDraft.icpName || (icps.find(i => i.id === selectedDraft.icpId)?.name) || 'Canadian Wealth'}
+                </span>
               </div>
             </div>
 
@@ -2018,117 +2030,17 @@ export default function SalesBrainView({ showToast }) {
       )}
 
       {/* =========================================================================
-         SLIDE-OVER SHEET: CREATE ICP (IcpFormSheet)
+         SLIDE-OVER SHEET: CREATE & EDIT ICP (IcpFormSheet - Exact Gentle CRM Replica)
          ========================================================================= */}
-      {createIcpOpen && (
-        <div className="sb-sheet-backdrop" onClick={() => setCreateIcpOpen(false)}>
-          <div className="sb-sheet-panel" onClick={e => e.stopPropagation()}>
-            <div className="sb-sheet-header">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="sb-sheet-title">Target Ideal Customer Profile</h3>
-                  <p className="sb-sheet-desc">Auditable targeting matrices, seniority gates, and scoring weights.</p>
-                </div>
-                <button className="sb-btn sb-btn-ghost sb-btn-icon" onClick={() => setCreateIcpOpen(false)}>
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleCreateIcp} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300 block">Profile Name</label>
-                <input
-                  type="text"
-                  required
-                  className="sb-input w-full"
-                  placeholder="e.g. Canadian Senior Medical Directors & Clinic Owners"
-                  value={newIcpForm.name}
-                  onChange={e => setNewIcpForm({ ...newIcpForm, name: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300 block">Description</label>
-                <textarea
-                  className="sb-input w-full h-16 py-2"
-                  placeholder="Target persona background and mandate..."
-                  value={newIcpForm.description}
-                  onChange={e => setNewIcpForm({ ...newIcpForm, description: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300 block">Advisory Offer Value Prop</label>
-                <textarea
-                  className="sb-input w-full h-16 py-2"
-                  placeholder="Discretionary management, IPP pension, holding company tax shielding..."
-                  value={newIcpForm.offer}
-                  onChange={e => setNewIcpForm({ ...newIcpForm, offer: e.target.value })}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300 block">Minimum Score</label>
-                  <input
-                    type="number"
-                    min="50"
-                    max="95"
-                    className="sb-input w-full"
-                    value={newIcpForm.minScore}
-                    onChange={e => setNewIcpForm({ ...newIcpForm, minScore: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300 block">Discovery Mode</label>
-                  <select
-                    className="sb-select w-full"
-                    value={newIcpForm.searchMode}
-                    onChange={e => setNewIcpForm({ ...newIcpForm, searchMode: e.target.value })}
-                  >
-                    <option value="REVIEW">Review first</option>
-                    <option value="AUTOMATED">Automated</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300 block">Target Industries (Comma-separated)</label>
-                <input
-                  type="text"
-                  className="sb-input w-full"
-                  value={newIcpForm.industries}
-                  onChange={e => setNewIcpForm({ ...newIcpForm, industries: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300 block">Target Senior Titles</label>
-                <input
-                  type="text"
-                  className="sb-input w-full"
-                  value={newIcpForm.titles}
-                  onChange={e => setNewIcpForm({ ...newIcpForm, titles: e.target.value })}
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-white/10">
-                <button
-                  type="button"
-                  className="sb-btn sb-btn-ghost"
-                  onClick={() => setCreateIcpOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="sb-btn sb-btn-primary">
-                  Save ICP Profile
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <IcpFormSheet
+        open={createIcpOpen}
+        onOpenChange={setCreateIcpOpen}
+        icp={editingIcp}
+        onSaveSuccess={async (savedIcp) => {
+          notify(editingIcp ? `Updated ICP: ${savedIcp?.name || 'Profile'}` : `Created ICP: ${savedIcp?.name || 'Profile'}`, 'success');
+          await loadAllData();
+        }}
+      />
 
       {/* =========================================================================
          MODAL: SEARCH PLAN REVIEW (PlanReviewDialog)
@@ -2212,7 +2124,7 @@ export default function SalesBrainView({ showToast }) {
                 <label className="text-xs font-semibold text-slate-300 block">Email Body (HTML)</label>
                 <textarea
                   required
-                  className="sb-input w-full h-44 py-2 leading-relaxed"
+                  className="sb-textarea w-full h-44 py-2 leading-relaxed"
                   value={customBody}
                   onChange={e => setCustomBody(e.target.value)}
                 />

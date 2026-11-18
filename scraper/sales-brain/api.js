@@ -1,6 +1,7 @@
 // Autonomous AI Sales Brain REST API Router for VGT Wealth CRM
 import { store } from './store.js';
 import { db, pool } from './db.js';
+import { runCanadianIcpScraper, verifyCanadaSpecificity } from './canadianScraper.js';
 
 export function createSalesBrainApi() {
   const readJsonBody = async (req) => {
@@ -110,6 +111,11 @@ export function createSalesBrainApi() {
         }), true;
       }
 
+      // Verification Endpoint: GET /verify-canada or /icps/verify
+      if (method === 'GET' && (subpath === '/verify-canada' || subpath === '/icps/verify')) {
+        return jsonResponse(res, 200, verifyCanadaSpecificity()), true;
+      }
+
       // 3. ICPs: GET /icps, POST /icps
       if (method === 'GET' && subpath === '/icps') {
         const icps = store.getIcps();
@@ -154,7 +160,7 @@ export function createSalesBrainApi() {
       }
 
       // 4. ICP details, updates, actions: /icps/:id
-      const icpMatch = subpath.match(/^\/icps\/([^/]+)(\/(duplicate|rescore|search|searches|drafts|toggle))?$/);
+      const icpMatch = subpath.match(/^\/icps\/([^/]+)(\/(duplicate|rescore|search|searches|drafts|toggle|run|verify))?$/);
       if (icpMatch) {
         const icpId = icpMatch[1];
         const action = icpMatch[3];
@@ -180,6 +186,15 @@ export function createSalesBrainApi() {
             store.saveIcps(icps);
             return jsonResponse(res, 200, { success: true, deleted }), true;
           }
+        }
+
+        if (action === 'run' && method === 'POST') {
+          const result = runCanadianIcpScraper(icpId);
+          return jsonResponse(res, 200, result), true;
+        }
+
+        if (action === 'verify' && method === 'GET') {
+          return jsonResponse(res, 200, verifyCanadaSpecificity()), true;
         }
 
         if (action === 'toggle' && method === 'POST') {
@@ -214,15 +229,21 @@ export function createSalesBrainApi() {
 
         if ((action === 'search' || action === 'searches') && method === 'POST') {
           const body = await readJsonBody(req);
+          const reviewFirst = body.reviewFirst ?? true;
+
+          if (!reviewFirst) {
+            const result = runCanadianIcpScraper(icpId);
+            return jsonResponse(res, 201, result.search), true;
+          }
+
           const searches = store.getSearches();
           const targetIcp = icps[icpIndex] || { name: 'Target ICP' };
-          const reviewFirst = body.reviewFirst ?? true;
           const newSearch = {
             id: `search-job-${Date.now()}`,
             icpId: icpId,
             icpName: targetIcp.name,
-            status: reviewFirst ? 'PLANNED' : 'COMPLETED',
-            trigger: body.trigger || (reviewFirst ? 'AI_ASSISTED' : 'MANUAL'),
+            status: 'PLANNED',
+            trigger: body.trigger || 'AI_ASSISTED',
             plan: {
               query: body.query || `Search for ${targetIcp.name}`,
               filters: body.filters || targetIcp.criteria || {}
@@ -230,11 +251,11 @@ export function createSalesBrainApi() {
             rationale: body.rationale || 'Targeted Canadian professional search query formulated by AI Intent Brain.',
             page: 1,
             maxPages: body.maxPages || 3,
-            companiesFound: 24,
-            peopleFound: 45,
-            newLeads: reviewFirst ? 0 : 45,
-            qualified: reviewFirst ? 0 : 45,
-            revealed: reviewFirst ? 0 : 45,
+            companiesFound: 12,
+            peopleFound: 25,
+            newLeads: 0,
+            qualified: 0,
+            revealed: 0,
             createdAt: new Date().toISOString()
           };
           searches.unshift(newSearch);
@@ -264,13 +285,14 @@ export function createSalesBrainApi() {
         if (!search) return jsonResponse(res, 404, { error: 'Search job not found' }), true;
 
         if (action === 'approve') {
+          const result = runCanadianIcpScraper(search.icpId || 'icp-canadian-wealth');
           search.status = 'COMPLETED';
-          search.newLeads = search.peopleFound;
-          search.qualified = search.peopleFound;
-          search.revealed = search.peopleFound;
+          search.newLeads = result.newLeadsCount;
+          search.qualified = result.newLeadsCount;
+          search.revealed = result.newLeadsCount;
           search.finishedAt = new Date().toISOString();
           store.saveSearches(searches);
-          return jsonResponse(res, 200, { success: true, search }), true;
+          return jsonResponse(res, 200, { success: true, search, newLeadsCount: result.newLeadsCount }), true;
         }
 
         if (action === 'cancel') {

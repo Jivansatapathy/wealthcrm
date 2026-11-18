@@ -1,5 +1,121 @@
 [
   {
+    "id": "search-job-1795032107497",
+    "icpId": "icp-canadian-wealth",
+    "icpName": "Canadian Senior Professionals & Business Owners – Wealth Management",
+    "status": "COMPLETED",
+    "trigger": "MANUAL",
+    "plan": {
+      "query": "Canadian Senior Professionals Search (Canadian Senior Professionals & Business Owners – Wealth Management)",
+      "filters": {
+        "company": {
+          "industries": [
+            "Legal Services",
+            "Higher Education & Research",
+            "Medical Practice",
+            "Health Care",
+            "Professional Services"
+          ],
+          "keywords": [
+            "private wealth",
+            "corporate class",
+            "estate planning",
+            "tax shielding",
+            "pension rollover",
+            "succession",
+            "capital gains"
+          ],
+          "employeeMin": 1,
+          "employeeMax": 500,
+          "locations": [
+            "Canada",
+            "Ontario",
+            "Quebec",
+            "British Columbia",
+            "Alberta",
+            "Nova Scotia",
+            "Saskatchewan",
+            "Manitoba"
+          ]
+        },
+        "contact": {
+          "titles": [
+            "Partner",
+            "Senior Partner",
+            "Managing Partner",
+            "Counsel",
+            "Professor Emeritus",
+            "Physician",
+            "Doctor",
+            "Owner",
+            "Founder",
+            "President"
+          ],
+          "seniorities": [
+            "owner",
+            "founder",
+            "partner",
+            "c_suite",
+            "senior",
+            "director"
+          ]
+        },
+        "segments": [
+          {
+            "key": "A",
+            "label": "Direct Intent: Wealth Advisory & Capital Structuring",
+            "signals": [
+              "DIRECT_INTENT"
+            ]
+          },
+          {
+            "key": "B",
+            "label": "Behavioural: Estate Freeze & Pension Rollover",
+            "signals": [
+              "BEHAVIOURAL_INTENT"
+            ]
+          },
+          {
+            "key": "C",
+            "label": "Event-Based: Business Sale & Corporate Realization",
+            "signals": [
+              "EVENT_ACQUISITION"
+            ]
+          },
+          {
+            "key": "D",
+            "label": "Senior Partners & Emeritus Faculty (Canada Priority)",
+            "signals": [
+              "RESEARCH_SURGE"
+            ]
+          }
+        ],
+        "outreach": {
+          "aiWrite": true,
+          "senderName": "Catherine Sinclair",
+          "senderCompany": "ScotiaMcLeod & Private Banking",
+          "address": "44 King St W, Toronto, ON M5H 1H1",
+          "link": "https://crm.venusglobaltech.com",
+          "sequenceDays": [
+            3,
+            7,
+            14
+          ]
+        }
+      }
+    },
+    "rationale": "Executed verified Canadian legal, academic, and executive directory & corporate liquidity scraping against Canadian Wealth ICP criteria.",
+    "page": 1,
+    "maxPages": 3,
+    "companiesFound": 12,
+    "peopleFound": 23,
+    "newLeads": 23,
+    "qualified": 23,
+    "revealed": 23,
+    "createdAt": "2026-11-18T20:01:47.497Z",
+    "finishedAt": "2026-11-18T20:01:47.497Z"
+  },
+  {
     "id": "search-job-1795009615301",
     "icpId": "icp-canadian-wealth",
     "icpName": "Canadian Senior Professionals & Business Owners – Wealth Management",
