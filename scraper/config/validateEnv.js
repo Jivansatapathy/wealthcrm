@@ -26,7 +26,12 @@ export function validateRequiredEnv(options = {}) {
   const required = [
     'DATABASE_URL',
     'JWT_SECRET',
-    'DEMO_USER_PASSWORD'
+    'ADMIN_EMAIL',
+    'ADMIN_PASSWORD',
+    'ADVISOR_EMAIL',
+    'ADVISOR_PASSWORD',
+    'ASSOCIATE_EMAIL',
+    'ASSOCIATE_PASSWORD'
   ];
 
   const missing = [];

@@ -6,7 +6,10 @@ import { extractToken, verifyJwt } from '../../scraper/auth/index.js';
 describe('Authentication & Authorization Suite', () => {
   const JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-min-32-chars-length';
   const testPassword = process.env.TEST_USER_PASSWORD || 'WealthDemo2026!';
-  const demoPassword = process.env.DEMO_USER_PASSWORD || 'Wealth2026!';
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@scotia.wealth';
+  const adminPassword = process.env.ADMIN_PASSWORD || process.env.DEMO_USER_PASSWORD || 'Wealth2026!';
+  const advisorEmail = process.env.ADVISOR_EMAIL || 'advisor@scotia.wealth';
+  const advisorPassword = process.env.ADVISOR_PASSWORD || process.env.DEMO_USER_PASSWORD || 'Wealth2026!';
 
   describe('1. Password Hashing & Verification (bcrypt)', () => {
     it('hashes passwords and never stores plain text', async () => {
@@ -127,8 +130,8 @@ describe('Authentication & Authorization Suite', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: 'admin@scotia.wealth',
-          password: demoPassword
+          email: adminEmail,
+          password: adminPassword
         })
       });
 
@@ -137,7 +140,7 @@ describe('Authentication & Authorization Suite', () => {
       expect(data.success).toBe(true);
       expect(data.token).toBeDefined();
       expect(data.user.role).toBe('admin');
-      expect(data.user.email).toBe('admin@scotia.wealth');
+      expect(data.user.email).toBe(adminEmail.toLowerCase());
     });
 
     it('returns 401 Unauthorized for invalid password', async () => {
@@ -145,7 +148,7 @@ describe('Authentication & Authorization Suite', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: 'admin@scotia.wealth',
+          email: adminEmail,
           password: 'DefectivePassword123'
         })
       });
@@ -169,8 +172,8 @@ describe('Authentication & Authorization Suite', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: 'advisor@scotia.wealth',
-          password: demoPassword
+          email: advisorEmail,
+          password: advisorPassword
         })
       });
       const loginData = await loginRes.json();
@@ -182,7 +185,7 @@ describe('Authentication & Authorization Suite', () => {
       expect(meRes.status).toBe(200);
       const meData = await meRes.json();
       expect(meData.success).toBe(true);
-      expect(meData.user.email).toBe('advisor@scotia.wealth');
+      expect(meData.user.email).toBe(advisorEmail.toLowerCase());
       expect(meData.user.role).toBe('advisor');
     });
   });

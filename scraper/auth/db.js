@@ -18,26 +18,44 @@ export async function initUserTable() {
       CREATE INDEX IF NOT EXISTS idx_crm_users_email ON crm_users(email);
     `);
 
-    // Check if table is empty; if so, seed demo users
-    const countRes = await pool.query('SELECT count(*) FROM crm_users');
-    if (parseInt(countRes.rows[0].count, 10) === 0) {
-      const defaultPassword = process.env.DEMO_USER_PASSWORD;
-      if (!defaultPassword) {
-        throw new Error('[Auth DB] DEMO_USER_PASSWORD is not configured in environment. User seeding aborted.');
-      }
-      const hash = await bcrypt.hash(defaultPassword, 10);
+    // Seed and synchronize role accounts from environment variables (no hardcoded emails or passwords)
+    const adminEmail = process.env.ADMIN_EMAIL ? String(process.env.ADMIN_EMAIL).trim().toLowerCase() : null;
+    const adminPassword = process.env.ADMIN_PASSWORD || process.env.DEMO_USER_PASSWORD;
 
+    const advisorEmail = process.env.ADVISOR_EMAIL ? String(process.env.ADVISOR_EMAIL).trim().toLowerCase() : null;
+    const advisorPassword = process.env.ADVISOR_PASSWORD || process.env.DEMO_USER_PASSWORD;
+
+    const associateEmail = process.env.ASSOCIATE_EMAIL ? String(process.env.ASSOCIATE_EMAIL).trim().toLowerCase() : null;
+    const associatePassword = process.env.ASSOCIATE_PASSWORD || process.env.DEMO_USER_PASSWORD;
+
+    if (adminEmail && adminPassword) {
+      const adminHash = await bcrypt.hash(adminPassword, 10);
       await pool.query(`
         INSERT INTO crm_users (id, email, password_hash, full_name, title, role)
-        VALUES 
-          ('usr-admin-1', 'admin@scotia.wealth', $1, 'Catherine Sinclair', 'Senior Vice President & Wealth Advisor', 'admin'),
-          ('usr-adv-1', 'advisor@scotia.wealth', $1, 'Marcus Vance', 'Discretionary Portfolio Manager', 'advisor'),
-          ('usr-std-1', 'user@scotia.wealth', $1, 'Elena Vance', 'Associate Wealth Planner', 'user')
-        ON CONFLICT (email) DO NOTHING;
-      `, [hash]);
-
-      console.log('[Auth DB] Seeded initial CRM users (admin, advisor, user).');
+        VALUES ('usr-admin-1', $1, $2, 'Catherine Sinclair', 'Senior Vice President & Wealth Advisor', 'admin')
+        ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+      `, [adminEmail, adminHash]);
     }
+
+    if (advisorEmail && advisorPassword) {
+      const advisorHash = await bcrypt.hash(advisorPassword, 10);
+      await pool.query(`
+        INSERT INTO crm_users (id, email, password_hash, full_name, title, role)
+        VALUES ('usr-adv-1', $1, $2, 'Marcus Vance', 'Discretionary Portfolio Manager', 'advisor')
+        ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+      `, [advisorEmail, advisorHash]);
+    }
+
+    if (associateEmail && associatePassword) {
+      const associateHash = await bcrypt.hash(associatePassword, 10);
+      await pool.query(`
+        INSERT INTO crm_users (id, email, password_hash, full_name, title, role)
+        VALUES ('usr-std-1', $1, $2, 'Elena Vance', 'Associate Wealth Planner', 'user')
+        ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+      `, [associateEmail, associateHash]);
+    }
+
+    console.log('[Auth DB] Synchronized CRM role accounts (admin, advisor, associate) from environment.');
   } catch (err) {
     console.error('[Auth DB Error] Failed to initialize crm_users table:', err.message);
   }

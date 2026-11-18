@@ -8,7 +8,7 @@ vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
     user: {
       id: 'usr-admin-1',
-      email: 'admin@scotia.wealth',
+      email: process.env.ADMIN_EMAIL || 'admin@scotia.wealth',
       fullName: 'Catherine Sinclair',
       title: 'Senior Vice President & Wealth Advisor',
       role: 'admin'
