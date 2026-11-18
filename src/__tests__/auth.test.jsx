@@ -4,11 +4,13 @@ import jwt from 'jsonwebtoken';
 import { extractToken, verifyJwt } from '../../scraper/auth/index.js';
 
 describe('Authentication & Authorization Suite', () => {
-  const JWT_SECRET = process.env.JWT_SECRET || 'wealthcrm-dev-fallback-secret-2026-very-secure';
+  const JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-min-32-chars-length';
+  const testPassword = process.env.TEST_USER_PASSWORD || 'WealthDemo2026!';
+  const demoPassword = process.env.DEMO_USER_PASSWORD || 'Wealth2026!';
 
   describe('1. Password Hashing & Verification (bcrypt)', () => {
     it('hashes passwords and never stores plain text', async () => {
-      const plainPassword = 'WealthDemo2026!';
+      const plainPassword = testPassword;
       const hash = await bcrypt.hash(plainPassword, 10);
 
       expect(hash).not.toBe(plainPassword);
@@ -126,7 +128,7 @@ describe('Authentication & Authorization Suite', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: 'admin@scotia.wealth',
-          password: 'Wealth2026!'
+          password: demoPassword
         })
       });
 
@@ -168,7 +170,7 @@ describe('Authentication & Authorization Suite', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: 'advisor@scotia.wealth',
-          password: 'Wealth2026!'
+          password: demoPassword
         })
       });
       const loginData = await loginRes.json();

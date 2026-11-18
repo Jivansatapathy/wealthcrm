@@ -1,7 +1,25 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import App from '../App';
+
+vi.mock('../context/AuthContext', () => ({
+  AuthProvider: ({ children }) => <>{children}</>,
+  useAuth: () => ({
+    user: {
+      id: 'usr-admin-1',
+      email: 'admin@scotia.wealth',
+      fullName: 'Catherine Sinclair',
+      title: 'Senior Vice President & Wealth Advisor',
+      role: 'admin'
+    },
+    token: 'mock-test-jwt-token',
+    isAuthenticated: true,
+    isLoading: false,
+    login: vi.fn(),
+    logout: vi.fn()
+  })
+}));
 
 describe('App Full Integration Test', () => {
   it('shows only the enabled views in the sidebar', () => {

@@ -1,5 +1,11 @@
 // Intent scraper service. Run: npm run scraper   (or `npm run scraper:once` for a single scrape)
 // Endpoints: GET /health | GET /leads?min=40 | POST /refresh | GET/POST /sources | DELETE /sources/:id
+import { loadEnv, validateRequiredEnv } from './config/validateEnv.js';
+
+// Load .env and fail-fast if required secrets are absent
+loadEnv();
+validateRequiredEnv();
+
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

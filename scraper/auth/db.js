@@ -21,7 +21,10 @@ export async function initUserTable() {
     // Check if table is empty; if so, seed demo users
     const countRes = await pool.query('SELECT count(*) FROM crm_users');
     if (parseInt(countRes.rows[0].count, 10) === 0) {
-      const defaultPassword = process.env.DEMO_USER_PASSWORD || 'Wealth2026!';
+      const defaultPassword = process.env.DEMO_USER_PASSWORD;
+      if (!defaultPassword) {
+        throw new Error('[Auth DB] DEMO_USER_PASSWORD is not configured in environment. User seeding aborted.');
+      }
       const hash = await bcrypt.hash(defaultPassword, 10);
 
       await pool.query(`

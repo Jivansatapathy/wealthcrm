@@ -3,7 +3,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { userDb, initUserTable } from './db.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'wealthcrm-dev-fallback-secret-2026-very-secure';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('[Auth Security Error] JWT_SECRET environment variable is missing.');
+}
 const TOKEN_EXPIRY = '7d';
 
 // In-memory sliding-window rate limiter for login brute-force prevention
