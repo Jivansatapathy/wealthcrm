@@ -1,13 +1,33 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { createSalesBrainApi } from './scraper/sales-brain/api.js';
+import { createAuthApi } from './scraper/auth/index.js';
+import { loadEnv } from './scraper/config/validateEnv.js';
+
+// Ensure .env is loaded before API handlers initialize
+loadEnv();
 
 const salesBrainApi = createSalesBrainApi();
+const authApi = createAuthApi();
 
 // Vite plugin to provide live Canadian market intelligence without CORS issues
 const liveMarketDataPlugin = () => ({
   name: 'live-market-data-plugin',
   configureServer(server) {
+    // Auth API middleware directly inside Vite dev server
+    server.middlewares.use(async (req, res, next) => {
+      if (req.url && (req.url.startsWith('/api/auth') || req.url.startsWith('/auth'))) {
+        try {
+          const parsedUrl = new URL(req.url, 'http://localhost:3000');
+          const handled = await authApi(req, res, parsedUrl.pathname);
+          if (handled) return;
+        } catch (e) {
+          console.error('[Vite Auth Plugin Error]:', e);
+        }
+      }
+      next();
+    });
+
     // Sales Brain API middleware directly inside Vite dev server
     server.middlewares.use(async (req, res, next) => {
       if (req.url && (req.url.startsWith('/api/sales-brain') || req.url.startsWith('/sales-brain'))) {
