@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   BrainCircuit, Sparkles, Rocket, Users, Mail, Clock, Activity, CalendarClock,
   LineChart, Plus, CheckCircle2, AlertTriangle, RefreshCw, X, Search,
   ExternalLink, Eye, Send, ThumbsUp, ThumbsDown, Zap, ShieldCheck, ChevronRight,
   Flame, Phone, MailOpen, MousePointerClick, MessageSquareReply, Play, Pause,
-  Filter, ChevronLeft, Pencil, Copy, Trash2, ArrowRight, Loader2, Flag
+  Filter, ChevronLeft, Pencil, Copy, Trash2, ArrowRight, Loader2, Flag,
+  Coffee, LogOut, Bell, Calendar
 } from 'lucide-react';
 
 const API_BASE = '/api/sales-brain';
@@ -31,9 +32,29 @@ function fmtDate(iso) {
   if (!iso) return '-';
   try {
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return '-';
     return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
   } catch {
-    return iso;
+    return '-';
+  }
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '-';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    }) + ', ' + d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch {
+    return '-';
   }
 }
 
@@ -55,6 +76,23 @@ function LeadStatusBadge({ status }) {
     DUPLICATE: 'sb-badge-muted'
   };
   return <span className={`sb-badge ${map[status] || 'sb-badge-muted'}`}>{statusLabel(status)}</span>;
+}
+
+function getFeedEventMeta(type) {
+  switch (type) {
+    case 'EMAIL_OPENED':
+      return { icon: MailOpen, action: 'email opened', boxClass: 'sb-feed-icon-open' };
+    case 'EMAIL_CLICKED':
+      return { icon: MousePointerClick, action: 'link clicked', boxClass: 'sb-feed-icon-click' };
+    case 'EMAIL_REPLIED':
+      return { icon: MessageSquareReply, action: 'replied to outreach', boxClass: 'sb-feed-icon-reply' };
+    case 'MEETING_BOOKED':
+      return { icon: CalendarClock, action: 'meeting booked', boxClass: 'sb-feed-icon-meeting' };
+    case 'EMAIL_SENT':
+      return { icon: Send, action: 'outreach sent', boxClass: 'sb-feed-icon-sent' };
+    default:
+      return { icon: Mail, action: 'outreach sent', boxClass: 'sb-feed-icon-default' };
+  }
 }
 
 function JobStatusBadge({ status }) {
@@ -148,6 +186,10 @@ export default function SalesBrainView({ showToast }) {
   const [fuQuery, setFuQuery] = useState('');
   const [fuTempFilter, setFuTempFilter] = useState('ALL');
   const [fuOutcomeFilter, setFuOutcomeFilter] = useState('ALL');
+
+  // Command Center Follow-Up Queue Filters (Gentle CRM Replica)
+  const [queueDateFilter, setQueueDateFilter] = useState('');
+  const [queueSortOrder, setQueueSortOrder] = useState('newest');
 
   // Engagement Tab Subtab
   const [engSubTab, setEngSubTab] = useState('overview');
@@ -424,14 +466,73 @@ export default function SalesBrainView({ showToast }) {
     return leads.filter(l => (l.tier === 'HOT' || l.score >= 90));
   }, [leads]);
 
+  // Command Center Follow-Ups (Gentle CRM Replica)
+  const displayedFollowups = useMemo(() => {
+    let list = followups.filter(f => f.status === 'PENDING' || !f.status);
+    if (queueDateFilter) {
+      list = list.filter(f => {
+        try {
+          const d = new Date(f.dueAt).toISOString().slice(0, 10);
+          return d === queueDateFilter;
+        } catch {
+          return false;
+        }
+      });
+    }
+    return list.sort((a, b) => {
+      const da = new Date(a.dueAt || 0).getTime();
+      const db = new Date(b.dueAt || 0).getTime();
+      return queueSortOrder === 'newest' ? db - da : da - db;
+    });
+  }, [followups, queueDateFilter, queueSortOrder]);
+
+  // Dynamic sticky top calculation:
+  // If the left column is taller than the viewport, it scrolls naturally until
+  // its bottom is fully visible in the viewport, and THEN sticks!
+  const leftColRef = useRef(null);
+  const [stickyTop, setStickyTop] = useState(null);
+
+  useEffect(() => {
+    function calculateStickyTop() {
+      if (!leftColRef.current) return;
+      const colHeight = leftColRef.current.offsetHeight;
+      const vh = window.innerHeight;
+      const bottomGap = 24;
+      const topGap = 20;
+
+      if (colHeight > vh - (topGap + bottomGap)) {
+        // Taller than viewport: let panel scroll until its bottom reaches bottomGap above viewport bottom
+        setStickyTop(vh - colHeight - bottomGap);
+      } else {
+        // Fits comfortably: stick at topGap
+        setStickyTop(topGap);
+      }
+    }
+
+    calculateStickyTop();
+    window.addEventListener('resize', calculateStickyTop);
+
+    const ro = new ResizeObserver(() => {
+      calculateStickyTop();
+    });
+    if (leftColRef.current) {
+      ro.observe(leftColRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', calculateStickyTop);
+      ro.disconnect();
+    };
+  }, [hotLeads, engagement, activeTab]);
+
   return (
     <div className="sb-container">
-      {/* ----------------- TOP HEADER BAR ----------------- */}
+      {/* ----------------- TOP HEADER & STATUS BAR (GENTLE CRM EXACT REPLICA) ----------------- */}
       <div className="sb-header-bar">
         <div className="sb-header-left">
           <div className="sb-header-title-row">
             <div className="sb-icon-box">
-              <BrainCircuit className="size-5 text-indigo-400" />
+              <BrainCircuit size={20} className="text-cyan-400" />
             </div>
             <h1 className="sb-header-title">AI Sales &amp; Engagement Brain</h1>
             <div className="sb-pulse-badge">
@@ -445,31 +546,32 @@ export default function SalesBrainView({ showToast }) {
         </div>
 
         <div className="sb-header-controls">
-          <div className="sb-vertical-pill">
-            <span className="size-1.5 rounded-full bg-indigo-400" />
-            Private Wealth Management
+          <div className="sb-vertical-switch">
+            <button className="sb-vertical-btn active">🍁 Wealth Management</button>
+            <button className="sb-vertical-btn">🏢 Corporate Holdco</button>
+            <button className="sb-vertical-btn">🌐 All</button>
           </div>
           <button className="sb-btn sb-btn-primary" onClick={() => setCreateIcpOpen(true)}>
             <Plus size={14} /> Create ICP
           </button>
           <button className="sb-btn sb-btn-outline" onClick={() => setActiveTab('automations')}>
-            <Zap size={14} className="text-amber-400" /> Automations &amp; Schedules
+            <Zap size={14} className="text-cyan-400" /> Automations &amp; Schedules
           </button>
         </div>
       </div>
 
-      {/* ----------------- MAIN UNIFIED NAVIGATION TABS ----------------- */}
+      {/* ----------------- GENTLE CRM REPLICA NAVIGATION TABS ----------------- */}
       <div className="sb-tabs-nav">
         <div className="sb-tabs-list">
           {[
-            { id: 'command', label: 'Command Center', icon: Sparkles, color: 'text-indigo-400' },
+            { id: 'command', label: 'Command Center', icon: Zap, color: 'text-cyan-400' },
             { id: 'follow-ups', label: 'Follow-Ups & Outcomes', icon: Clock, color: 'text-indigo-400' },
             { id: 'engagement', label: 'Engagement & Hot Leads', icon: Activity, color: 'text-rose-400' },
             { id: 'automations', label: 'Automations & Schedules', icon: CalendarClock, color: 'text-amber-400' },
             { id: 'icps', label: `ICPs (${icps.length})`, icon: Users },
-            { id: 'searches', label: `Searches (${searches.length})`, icon: Rocket },
-            { id: 'leads', label: `Leads (${leads.length})`, icon: BrainCircuit },
-            { id: 'outreach', label: `Outreach Drafts (${pendingDraftsCount})`, icon: Mail },
+            { id: 'searches', label: `Searches (${searches.length})`, icon: Search },
+            { id: 'leads', label: `Leads (${leads.length})`, icon: Users },
+            { id: 'outreach', label: `Outreach (${pendingDraftsCount})`, icon: Mail },
             { id: 'insights', label: 'Insights', icon: LineChart, color: 'text-slate-400' },
           ].map(t => {
             const Icon = t.icon;
@@ -480,7 +582,7 @@ export default function SalesBrainView({ showToast }) {
                 className={`sb-tab-trigger ${active ? 'active' : ''}`}
                 onClick={() => setActiveTab(t.id)}
               >
-                <Icon size={14} className={t.color || 'text-slate-300'} />
+                <Icon size={14} className={t.color || 'text-slate-400'} />
                 <span>{t.label}</span>
               </button>
             );
@@ -489,98 +591,116 @@ export default function SalesBrainView({ showToast }) {
       </div>
 
       {/* =========================================================================
-         1. COMMAND CENTER TAB
+         1. COMMAND CENTER TAB (GENTLE CRM REPLICA)
          ========================================================================= */}
       {activeTab === 'command' && (
-        <div className="space-y-6">
-          {/* 7-column High-Density Metric Strip */}
-          <div className="sb-metric-strip-7">
-            <div className="sb-stat-tile">
-              <span className="sb-stat-label">Active ICPs</span>
-              <span className="sb-stat-val">{dashboard?.activeIcps ?? 2} / {dashboard?.icps ?? 2}</span>
+        <div className="space-y-5">
+          {/* 7-column Unified Metric Strip with Vertical Borders (Gentle CRM Replica) */}
+          <div className="sb-unified-metrics">
+            <div className="sb-metric-cell">
+              <span className="sb-metric-cell-label">Active ICPs</span>
+              <span className="sb-metric-cell-value">
+                {dashboard?.activeIcps ?? 2} / {dashboard?.icps ?? 2}
+              </span>
             </div>
-            <div className="sb-stat-tile">
-              <span className="sb-stat-label">Total Leads</span>
-              <span className="sb-stat-val">{dashboard?.totalLeads ?? leads.length}</span>
+            <div className="sb-metric-cell">
+              <span className="sb-metric-cell-label">Total Leads</span>
+              <span className="sb-metric-cell-value">
+                {dashboard?.totalLeads ?? leads.length}
+              </span>
             </div>
-            <div className="sb-stat-tile">
-              <span className="sb-stat-label">Emails Sent Today</span>
-              <span className="sb-stat-val">{dashboard?.stats?.todaySent ?? 18}</span>
+            <div className="sb-metric-cell">
+              <span className="sb-metric-cell-label">Emails Sent Today</span>
+              <span className="sb-metric-cell-value">
+                {dashboard?.stats?.todaySent ?? 18}
+              </span>
             </div>
-            <div className="sb-stat-tile">
-              <span className="sb-stat-label">Open Rate</span>
-              <span className="sb-stat-val text-indigo-400">{dashboard?.stats?.openRate ?? 46.2}%</span>
+            <div className="sb-metric-cell">
+              <span className="sb-metric-cell-label">Open Rate</span>
+              <span className="sb-metric-cell-value text-cyan-400">
+                {dashboard?.stats?.openRate ?? 46.2}%
+              </span>
             </div>
-            <div className="sb-stat-tile">
-              <span className="sb-stat-label">Click Rate</span>
-              <span className="sb-stat-val text-emerald-400">{dashboard?.stats?.clickRate ?? 24.8}%</span>
+            <div className="sb-metric-cell">
+              <span className="sb-metric-cell-label">Click Rate</span>
+              <span className="sb-metric-cell-value text-emerald-400">
+                {dashboard?.stats?.clickRate ?? 24.8}%
+              </span>
             </div>
-            <div className="sb-stat-tile">
-              <span className="sb-stat-label">Hot Leads</span>
-              <span className="sb-stat-val text-rose-400">{dashboard?.leadsByTier?.HOT ?? 325}</span>
+            <div className="sb-metric-cell">
+              <span className="sb-metric-cell-label">Hot Leads</span>
+              <span className="sb-metric-cell-value text-rose-500">
+                {dashboard?.leadsByTier?.HOT ?? 355}
+              </span>
             </div>
-            <div className="sb-stat-tile">
-              <span className="sb-stat-label">Follow-Ups Due</span>
-              <span className="sb-stat-val text-amber-400">{followups.filter(f => f.status === 'PENDING').length}</span>
+            <div className="sb-metric-cell">
+              <span className="sb-metric-cell-label">Follow-Ups Due</span>
+              <span className="sb-metric-cell-value text-amber-400">
+                {followups.filter(f => f.status === 'PENDING').length}
+              </span>
             </div>
           </div>
 
-          {/* Quick Action Command Toolbar */}
-          <div className="sb-command-toolbar">
-            <div className="sb-toolbar-actions">
-              <button className="sb-btn sb-btn-primary" onClick={() => setCreateIcpOpen(true)}>
+          {/* Action Toolbar (Gentle CRM Replica) */}
+          <div className="sb-action-toolbar">
+            <div className="sb-toolbar-group">
+              <button className="sb-btn-primary-action" onClick={() => setCreateIcpOpen(true)}>
                 <Plus size={14} /> New ICP Profile
               </button>
-              <button className="sb-btn sb-btn-outline" onClick={() => setActiveTab('searches')}>
-                <Rocket size={14} className="text-indigo-400" /> Run Apollo Search
+              <button className="sb-btn-secondary-action" onClick={() => setActiveTab('searches')}>
+                <Search size={14} className="text-indigo-400" /> Run Apollo Search
               </button>
-              <button className="sb-btn sb-btn-outline" disabled={!pendingDraftsCount} onClick={handleApproveAllDrafts}>
+              <button className="sb-btn-secondary-action" disabled={!pendingDraftsCount} onClick={handleApproveAllDrafts}>
                 <CheckCircle2 size={14} className="text-emerald-400" /> Approve All Pending ({pendingDraftsCount})
               </button>
-              <button className="sb-btn sb-btn-outline" onClick={loadAllData}>
+              <button className="sb-btn-secondary-action" onClick={loadAllData}>
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Re-run Skipped Outreach
               </button>
             </div>
             <div>
-              <button className="sb-btn sb-btn-ghost" onClick={() => setActiveTab('automations')}>
+              <button className="sb-link-action" onClick={() => setActiveTab('automations')}>
                 Automations &amp; Schedules <ArrowRight size={13} />
               </button>
             </div>
           </div>
 
-          {/* Two-Column Split Layout */}
+          {/* Two-Column Split Layout (Gentle CRM Replica) */}
           <div className="sb-two-col-grid">
-            {/* Left Column: High-Intent Spotlight & Activity Feed */}
-            <div className="space-y-5">
-              {/* High Intent Hot Leads Strip */}
+            {/* Left Column: High-Intent Spotlight & Activity Feed (Sticky when reaching its end) */}
+            <div
+              ref={leftColRef}
+              className="sb-command-left-col"
+              style={stickyTop !== null ? { top: `${stickyTop}px` } : undefined}
+            >
+              {/* Card 1: High-Intent Leads Spotlight */}
               <div className="sb-card-panel">
                 <div className="sb-card-header">
                   <div className="sb-card-title">
-                    <Flame size={16} className="text-rose-400" />
+                    <Flame size={16} className="text-rose-500" />
                     <span>High-Intent Leads Spotlight</span>
                   </div>
-                  <button className="sb-btn sb-btn-ghost sb-btn-xs" onClick={() => setActiveTab('engagement')}>
+                  <button className="text-xs text-slate-400 hover:text-white transition-colors" onClick={() => setActiveTab('engagement')}>
                     View all ({hotLeads.length})
                   </button>
                 </div>
-                <div className="sb-divide-y">
+                <div>
                   {hotLeads.slice(0, 4).map(lead => (
-                    <div key={lead.id} className="p-3.5 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-white truncate">
-                            {[lead.firstName, lead.lastName].filter(Boolean).join(' ')}
+                    <div key={lead.id} className="sb-spotlight-row">
+                      <div className="min-w-0 flex-1">
+                        <div className="sb-spotlight-name-wrap">
+                          <span className="sb-spotlight-name">
+                            {[lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.companyName || 'Corporate Executive'}
                           </span>
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                          <span className="sb-fu-pill-badge sb-fu-pill-hot">
                             Hot
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                          {lead.companyName ? `${lead.companyName} · ` : ''}{lead.title || 'Senior Executive'} · Score {Math.round(lead.score)}
+                        <p className="sb-spotlight-sub">
+                          {lead.companyName ? `${lead.companyName} · ` : ''}{lead.title || 'Senior Executive'} · Score {Math.round(lead.score || 91)}
                         </p>
                       </div>
                       <button
-                        className="sb-btn sb-btn-outline sb-btn-xs gap-1 shrink-0"
+                        className="sb-btn-followup"
                         onClick={() => {
                           setCustomDraftLead(lead);
                           setCustomSubject(`Discretionary Portfolio Advisory – ${lead.companyName || 'Private Wealth'}`);
@@ -594,90 +714,146 @@ export default function SalesBrainView({ showToast }) {
                 </div>
               </div>
 
-              {/* Real-Time Activity Feed */}
+              {/* Card 2: Real-Time Engagement Feed */}
               <div className="sb-card-panel">
                 <div className="sb-card-header">
                   <div className="sb-card-title">
-                    <Activity size={16} className="text-indigo-400" />
+                    <Activity size={16} className="text-cyan-400" />
                     <span>Real-Time Engagement Feed</span>
                   </div>
-                  <span className="text-xs text-slate-400">Live updates</span>
+                  <span className="text-xs text-slate-500">Live updates</span>
                 </div>
-                <div className="sb-divide-y max-h-[460px] overflow-y-auto">
-                  {engagement.slice(0, 8).map(ev => (
-                    <div key={ev.id} className="flex items-start gap-3 p-3">
-                      <div className="size-7 rounded-full bg-[#070B14] border border-white/10 flex items-center justify-center shrink-0 mt-0.5">
-                        {ev.type === 'EMAIL_OPENED' ? <MailOpen size={13} className="text-indigo-400" /> :
-                         ev.type === 'EMAIL_CLICKED' ? <MousePointerClick size={13} className="text-emerald-400" /> :
-                         ev.type === 'EMAIL_REPLIED' ? <MessageSquareReply size={13} className="text-purple-400" /> :
-                         <Mail size={13} className="text-slate-400" />}
+                <div className="sb-feed-list">
+                  {engagement.slice(0, 8).map(ev => {
+                    const meta = getFeedEventMeta(ev.type);
+                    const EventIcon = meta.icon;
+
+                    return (
+                      <div key={ev.id} className="sb-feed-item">
+                        <div className={`sb-feed-icon-box ${meta.boxClass}`}>
+                          <EventIcon size={16} />
+                        </div>
+                        <div className="sb-feed-content">
+                          <div className="sb-feed-title-line">
+                            <span className="sb-feed-lead-name">{ev.leadName}</span>
+                            <span className="sb-feed-action-text">{meta.action}</span>
+                          </div>
+                          <div className="sb-feed-time-line">
+                            <span>{fmtDateTime(ev.timestamp)}</span>
+                            {ev.company && (
+                              <>
+                                <span className="sb-feed-dot">·</span>
+                                <span>{ev.company}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {ev.scoreDelta && (
+                          <span className="sb-feed-badge sb-badge-good">
+                            {ev.scoreDelta}
+                          </span>
+                        )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs text-white">
-                          <span className="font-semibold">{ev.leadName}</span>{' '}
-                          <span className="text-slate-400">{statusLabel(ev.type)}</span>
-                        </p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {fmtDate(ev.timestamp)} · {ev.company} · Delta: {ev.scoreDelta}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* Right Column: Urgent Follow-Up Tasks Queue */}
-            <div className="sb-card-panel">
+            {/* Right Column: Urgent Follow-Up Tasks Queue (Gentle CRM Replica) */}
+            <div className="sb-command-right-col sb-card-panel">
               <div className="sb-card-header">
                 <div className="sb-card-title">
                   <CalendarClock size={16} className="text-amber-400" />
                   <span>Urgent Follow-Up Queue</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold tabular-nums text-slate-400">
-                    {followups.filter(f => f.status === 'PENDING').length} due
+                  <span className="text-xs tabular-nums text-slate-400">
+                    {displayedFollowups.length} due
                   </span>
                   <button
                     onClick={() => setActiveTab('follow-ups')}
-                    className="text-[11px] text-indigo-400 hover:underline font-medium"
+                    className="text-xs text-indigo-400 hover:underline font-medium"
                   >
                     View Hub →
                   </button>
                 </div>
               </div>
-              <div className="sb-divide-y max-h-[580px] overflow-y-auto">
-                {followups.slice(0, 6).map(fu => (
-                  <div key={fu.id} className="p-3.5 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h4 className="text-xs font-semibold text-white">{fu.contactName}</h4>
-                        <p className="text-[11px] text-slate-400">{fu.company} · Due: {fmtDate(fu.dueAt)}</p>
-                      </div>
-                      <span className="sb-badge sb-badge-warn text-[10px]">Urgent</span>
-                    </div>
-                    <p className="text-xs text-slate-300 line-clamp-2 bg-[#070B14] p-2 rounded border border-white/5">
-                      {fu.prompt}
-                    </p>
-                    <div className="flex items-center justify-end gap-1.5 pt-1">
-                      <button
-                        className="sb-btn sb-btn-outline sb-btn-xs gap-1"
-                        onClick={() => {
-                          const mLead = leads.find(l => l.companyName === fu.company);
-                          if (mLead) setSelectedLeadId(mLead.id);
-                        }}
-                      >
-                        Lead Dossier
-                      </button>
-                      <button
-                        className="sb-btn sb-btn-primary sb-btn-xs gap-1"
-                        onClick={() => handleDismissFollowup(fu.id)}
-                      >
-                        <CheckCircle2 size={12} /> Complete
-                      </button>
-                    </div>
+
+              {/* Filter Bar: Date Picker + Sort Select (Matches Gentle CRM) */}
+              <div className="sb-fu-filter-bar">
+                <input
+                  type="date"
+                  className="sb-fu-date-picker"
+                  value={queueDateFilter}
+                  onChange={(e) => setQueueDateFilter(e.target.value)}
+                  placeholder="dd-mm-yyyy"
+                />
+                <select
+                  className="sb-fu-sort-select"
+                  value={queueSortOrder}
+                  onChange={(e) => setQueueSortOrder(e.target.value)}
+                >
+                  <option value="newest">Newest due date first</option>
+                  <option value="oldest">Oldest due date first</option>
+                </select>
+              </div>
+
+              {/* Individual Follow-Up Item Cards (Scrolls naturally to end) */}
+              <div className="sb-fu-card-list">
+                {displayedFollowups.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-500">
+                    {queueDateFilter ? 'No follow-up tasks due on that date.' : 'All caught up! No follow-up tasks due right now.'}
                   </div>
-                ))}
+                ) : (
+                  displayedFollowups.map(fu => {
+                    const mLead = leads.find(l => l.companyName === fu.company || l.id === fu.brainLeadId);
+                    const score = mLead?.score ? Math.round(mLead.score) : 91;
+                    const isHot = score >= 85;
+                    const isWarm = score >= 60 && score < 85;
+
+                    return (
+                      <div key={fu.id} className="sb-fu-item-card">
+                        <div className="sb-fu-item-header">
+                          <span className="sb-fu-item-name">{fu.leadName || fu.contactName || 'Corporate Contact'}</span>
+                          <span className={`sb-fu-pill-badge ${isHot ? 'sb-fu-pill-hot' : isWarm ? 'sb-fu-pill-warm' : 'sb-fu-pill-cold'}`}>
+                            {isHot ? `Hot · ${score}` : isWarm ? `Warm · ${score}` : `Cold · ${score}`}
+                          </span>
+                        </div>
+                        <div className="sb-fu-item-meta">
+                          <span>{fu.company}</span>
+                          <span>·</span>
+                          <span className="flex items-center gap-1">
+                            <Calendar size={12} className="text-slate-400" />
+                            Due {fmtDateTime(fu.dueAt)}
+                          </span>
+                        </div>
+                        <div className="sb-fu-actions-row">
+                          <button
+                            className="sb-btn-ai-draft"
+                            onClick={() => {
+                              if (mLead) {
+                                setCustomDraftLead(mLead);
+                                setCustomSubject(`Discretionary Wealth Structuring – ${mLead.companyName || fu.company}`);
+                                setCustomBody(`<p>Dear ${mLead.firstName || 'Executive'},</p><p>Following up on our private wealth advisory discussion regarding ${fu.company}.</p>`);
+                              } else {
+                                notify(`Draft generated for ${fu.leadName || fu.contactName}`, 'info');
+                              }
+                            }}
+                          >
+                            <Sparkles size={12} /> AI Draft &amp; Send
+                          </button>
+                          <button
+                            className="sb-btn-dismiss"
+                            onClick={() => handleDismissFollowup(fu.id)}
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -1529,10 +1705,11 @@ export default function SalesBrainView({ showToast }) {
       )}
 
       {/* =========================================================================
-         9. INSIGHTS TAB (EXACT REPLICA OF dashboard-tab.tsx)
+         9. INSIGHTS TAB (EXACT REPLICA OF GENTLE CRM DASHBOARD-TAB)
          ========================================================================= */}
       {activeTab === 'insights' && (
         <div className="space-y-6">
+          {/* Top 4 Stat Tiles */}
           <div className="sb-metric-strip-4">
             <div className="sb-stat-tile">
               <span className="sb-stat-label">ICPs</span>
@@ -1544,7 +1721,7 @@ export default function SalesBrainView({ showToast }) {
             </div>
             <div className="sb-stat-tile">
               <span className="sb-stat-label">Apollo credits used this month</span>
-              <span className="sb-stat-val text-indigo-400">142</span>
+              <span className="sb-stat-val text-white">142</span>
             </div>
             <div className="sb-stat-tile">
               <span className="sb-stat-label">Searches run</span>
@@ -1552,9 +1729,9 @@ export default function SalesBrainView({ showToast }) {
             </div>
           </div>
 
-          {/* Outreach Drafts breakdown */}
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-white">Outreach drafts</h2>
+          {/* Outreach drafts breakdown */}
+          <section className="sb-insights-section">
+            <h2 className="sb-insights-heading">Outreach drafts</h2>
             <div className="sb-metric-strip-4">
               <div className="sb-stat-tile">
                 <span className="sb-stat-label">Pending approval</span>
@@ -1575,44 +1752,85 @@ export default function SalesBrainView({ showToast }) {
             </div>
           </section>
 
-          {/* Leads by Status */}
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-white">Leads by status</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {/* Leads by Status (Responsive 4-column bordered cards) */}
+          <section className="sb-insights-section">
+            <h2 className="sb-insights-heading">Leads by status</h2>
+            <div className="sb-status-cards-grid">
               {[
-                { status: 'HIGH_PRIORITY', label: 'High Priority', count: 40 },
-                { status: 'QUALIFIED', label: 'Qualified', count: 140 },
-                { status: 'READY_FOR_OUTREACH', label: 'Ready For Outreach', count: 120 },
-                { status: 'IN_CAMPAIGN', label: 'In Campaign', count: 100 },
-                { status: 'CONTACTED', label: 'Contacted', count: 30 },
-                { status: 'REPLIED', label: 'Replied', count: 15 },
-                { status: 'NEW', label: 'New', count: 293 },
+                { status: 'HIGH_PRIORITY', label: 'High Priority', count: 40, dotColor: '#F43F5E' },
+                { status: 'QUALIFIED', label: 'Qualified', count: 140, dotColor: '#22D3EE' },
+                { status: 'READY_FOR_OUTREACH', label: 'Ready For Outreach', count: 120, dotColor: '#818CF8' },
+                { status: 'IN_CAMPAIGN', label: 'In Campaign', count: 100, dotColor: '#FBBF24' },
+                { status: 'CONTACTED', label: 'Contacted', count: 30, dotColor: '#60A5FA' },
+                { status: 'REPLIED', label: 'Replied', count: 15, dotColor: '#34D399' },
+                { status: 'NEW', label: 'New', count: 293, dotColor: '#94A3B8' },
               ].map(st => (
-                <div key={st.status} className="flex items-center justify-between rounded-lg border border-white/10 bg-[#111A2E] px-3.5 py-2.5">
-                  <span className="text-xs text-slate-400">{st.label}</span>
-                  <span className="text-sm font-semibold tabular-nums text-white">{st.count}</span>
+                <div key={st.status} className="sb-status-item-card">
+                  <div className="sb-status-item-left">
+                    <span className="sb-status-item-dot" style={{ backgroundColor: st.dotColor }} />
+                    <span className="sb-status-item-label">{st.label}</span>
+                  </div>
+                  <span className="sb-status-item-count">{st.count}</span>
                 </div>
               ))}
             </div>
           </section>
 
-          {/* Lead Sources */}
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-white">Lead sources</h2>
-            <div className="grid gap-3 sm:grid-cols-3">
+          {/* Search Demand (Gentle CRM Replica) */}
+          <section className="sb-insights-section">
+            <h2 className="sb-insights-heading">Search demand</h2>
+            <div className="sb-not-connected-card">
+              <p className="sb-not-connected-title">Not connected</p>
+              <p className="sb-not-connected-desc">
+                Search Console shows what people search for before they find you.{' '}
+                <span className="text-cyan-400 font-medium cursor-pointer hover:underline">
+                  Connect it in admin settings
+                </span>.
+              </p>
+            </div>
+          </section>
+
+          {/* Website Traffic Sources (Gentle CRM Replica) */}
+          <section className="sb-insights-section">
+            <h2 className="sb-insights-heading">Website traffic sources</h2>
+            <div className="sb-not-connected-card">
+              <p className="sb-not-connected-title">Not connected</p>
+              <p className="sb-not-connected-desc">
+                Google Analytics shows where your website visitors come from.{' '}
+                <span className="text-cyan-400 font-medium cursor-pointer hover:underline">
+                  Connect it in admin settings
+                </span>.
+              </p>
+            </div>
+          </section>
+
+          {/* Lead Sources (Responsive 3-column bordered cards) */}
+          <section className="sb-insights-section">
+            <h2 className="sb-insights-heading">Lead sources</h2>
+            <div className="sb-sources-cards-grid">
               {[
                 { label: 'Apollo.io People & Org API', connected: true, note: 'Primary B2B contact engine' },
                 { label: 'Canada TSX/SEDAR+ Filings', connected: true, note: 'Live Canadian wire signals & executive liquidity' },
                 { label: 'Canadian Legal & Medical Regs', connected: true, note: 'Law Society & Medical College directories' },
               ].map(src => (
-                <div key={src.label} className="sb-card-panel p-4 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-white">{src.label}</h4>
-                    <span className="sb-badge sb-badge-good text-[10px]">Connected</span>
+                <div key={src.label} className="sb-source-item-card">
+                  <div className="sb-source-item-header">
+                    <h4 className="sb-source-item-name">{src.label}</h4>
+                    <span className="sb-source-status-badge">
+                      <span className="sb-pulse-dot" /> Connected
+                    </span>
                   </div>
-                  <p className="text-xs text-slate-400">{src.note}</p>
+                  <p className="sb-source-item-note">{src.note}</p>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* Recent Failures (Gentle CRM Replica) */}
+          <section className="sb-insights-section">
+            <h2 className="sb-insights-heading">Recent failures</h2>
+            <div className="sb-empty-card">
+              No failed searches recorded. All automated prospecting and enrichment jobs completed successfully.
             </div>
           </section>
         </div>

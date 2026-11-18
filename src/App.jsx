@@ -224,13 +224,15 @@ function MainAppShell() {
 
       {/* Main App Area */}
       <main className="app-main">
-        <Header
-          currentView={currentView}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          onSimulateIntent={handleSimulateIntent}
-          onMenu={() => setMenuOpen(true)}
-        />
+        {currentView !== 'sales_brain' && (
+          <Header
+            currentView={currentView}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            onSimulateIntent={handleSimulateIntent}
+            onMenu={() => setMenuOpen(true)}
+          />
+        )}
 
         <section className="page-viewport">
           {!isAuthorized ? (
