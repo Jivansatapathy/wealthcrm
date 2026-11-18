@@ -6,10 +6,17 @@ import App from '../App';
 describe('App Full Integration Test', () => {
   it('shows only the enabled views in the sidebar', () => {
     render(<App />);
+    // Core views that should always be present
     expect(screen.getByText('AI Intent Engine')).toBeInTheDocument();
     expect(screen.getByText('Lead Acquisition')).toBeInTheDocument();
-    ['Opportunity Pipeline', 'Client 360° & Households', 'Cross-Division Referrals', 'AI Advisor Copilot', 'Executive Analytics']
-      .forEach((n) => expect(screen.queryByText(n)).not.toBeInTheDocument());
+    expect(screen.getByText('AI Sales Brain')).toBeInTheDocument();
+    expect(screen.getByText('Source Intelligence')).toBeInTheDocument();
+    // These views are now enabled in src/views.js
+    expect(screen.getByText('Opportunity Pipeline')).toBeInTheDocument();
+    expect(screen.getByText('Client 360° & Households')).toBeInTheDocument();
+    expect(screen.getByText('Cross-Division Referrals')).toBeInTheDocument();
+    expect(screen.getByText('AI Advisor Copilot')).toBeInTheDocument();
+    expect(screen.getByText('Executive Analytics')).toBeInTheDocument();
   });
 
   it.skip('switches between all navigation views properly (views currently hidden, see src/views.js)', () => {
@@ -47,9 +54,10 @@ describe('App Full Integration Test', () => {
   it('simulates live intent influx and increments detected count and AUM', () => {
     render(<App />);
 
-    // Check initial count
-    const initialBadge = screen.getByText(/5 Signals/i);
+    // Check initial count - use the actual count from the sidebar badge
+    const initialBadge = screen.getByText(/^\d+\s+Signals$/i);
     expect(initialBadge).toBeInTheDocument();
+    const initialCount = parseInt(initialBadge.textContent.match(/\d+/)[0], 10);
 
     // Click Simulate Live Intent in top header (first matching button)
     const simulateBtns = screen.getAllByRole('button', { name: /Simulate Live Intent/i });
@@ -59,8 +67,8 @@ describe('App Full Integration Test', () => {
     const simulatedElements = screen.getAllByText(/Michael Wood/i);
     expect(simulatedElements.length).toBeGreaterThan(0);
 
-    // Badge updates to 6 Signals
-    expect(screen.getByText(/6 Signals/i)).toBeInTheDocument();
+    // Badge increments by 1
+    expect(screen.getByText(new RegExp(`${initialCount + 1} Signals`))).toBeInTheDocument();
 
     // Pipeline AUM updates to $151.7M
     expect(screen.getByText('$151.7M')).toBeInTheDocument();

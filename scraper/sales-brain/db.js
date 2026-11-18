@@ -1,45 +1,65 @@
 // PostgreSQL Database Connection & Query Client for VGT Wealth CRM
 import pg from 'pg';
 
+// Automatically load .env if process.env.DATABASE_URL is not yet defined
+if (!process.env.DATABASE_URL && typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile();
+  } catch {
+    // Ignore if .env is missing or unreadable
+  }
+}
+
 const { Pool } = pg;
 
-const DATABASE_URL = process.env.DATABASE_URL || 
-  'postgresql://postgres:VoHEfHgKpWESwnKKWUZLnwJOTyLlQrhp@metro.proxy.rlwy.net:52123/railway';
+const DATABASE_URL = process.env.DATABASE_URL;
 
-export const pool = new Pool({
+if (!DATABASE_URL) {
+  console.warn('[PostgreSQL] DATABASE_URL not set in environment. Database features will be unavailable.');
+}
+
+export const pool = DATABASE_URL ? new Pool({
   connectionString: DATABASE_URL,
   ssl: false,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
-});
+}) : null;
 
-pool.on('error', (err) => {
-  console.error('[PostgreSQL] Unexpected idle client error:', err.message);
-});
+if (pool) {
+  pool.on('error', (err) => {
+    console.error('[PostgreSQL] Unexpected idle client error:', err.message);
+  });
 
-// Test connection on boot
-(async () => {
-  try {
-    const client = await pool.connect();
-    const res = await client.query('SELECT NOW() as current_time, COUNT(*) as lead_count FROM sales_brain_leads');
-    console.log(`[PostgreSQL] Connected to Railway DB successfully. Verified ${res.rows[0].lead_count} sales brain leads.`);
-    client.release();
-  } catch (err) {
-    console.warn('[PostgreSQL] Database connection notice:', err.message);
-  }
-})();
+  // Test connection on boot
+  (async () => {
+    try {
+      const client = await pool.connect();
+      const res = await client.query('SELECT NOW() as current_time, COUNT(*) as lead_count FROM sales_brain_leads');
+      console.log(`[PostgreSQL] Connected to Railway DB successfully. Verified ${res.rows[0].lead_count} sales brain leads.`);
+      client.release();
+    } catch (err) {
+      console.warn('[PostgreSQL] Database connection notice:', err.message);
+    }
+  })();
+}
+
+function assertPool() {
+  if (!pool) throw new Error('Database not configured: set DATABASE_URL in environment');
+}
 
 export const db = {
-  query: (text, params) => pool.query(text, params),
+  query: (text, params) => { assertPool(); return pool.query(text, params); },
 
   // Sales Brain Leads
   async getLeads(limit = 1000) {
+    assertPool();
     const res = await pool.query('SELECT raw_data FROM sales_brain_leads ORDER BY score DESC LIMIT $1', [limit]);
     return res.rows.map(r => r.raw_data);
   },
 
   async updateLeadStatus(id, status) {
+    assertPool();
     await pool.query(
       `UPDATE sales_brain_leads 
        SET status = $2, 
@@ -52,12 +72,14 @@ export const db = {
 
   // ICPs
   async getIcps() {
+    assertPool();
     const res = await pool.query('SELECT raw_data FROM sales_brain_icps ORDER BY created_at ASC');
     return res.rows.map(r => r.raw_data);
   },
 
   // Drafts
   async getDrafts() {
+    assertPool();
     const res = await pool.query('SELECT brain_lead as "brainLead", * FROM sales_brain_drafts ORDER BY created_at DESC');
     return res.rows.map(r => ({
       id: r.id,
@@ -79,36 +101,42 @@ export const db = {
 
   // Canada Prospects (from CSV)
   async getCanadaProspects(limit = 1000) {
+    assertPool();
     const res = await pool.query('SELECT * FROM canada_prospects ORDER BY id ASC LIMIT $1', [limit]);
     return res.rows;
   },
 
   // Wealth Signals
   async getWealthSignals(limit = 1000) {
+    assertPool();
     const res = await pool.query('SELECT raw_data FROM wealth_signals ORDER BY intent_score DESC LIMIT $1', [limit]);
     return res.rows.map(r => r.raw_data);
   },
 
   // Automations
   async getAutomations() {
+    assertPool();
     const res = await pool.query('SELECT raw_data FROM sales_brain_automations');
     return res.rows.map(r => r.raw_data);
   },
 
   // Followups
   async getFollowups() {
+    assertPool();
     const res = await pool.query('SELECT raw_data FROM sales_brain_followups ORDER BY due_at ASC');
     return res.rows.map(r => r.raw_data);
   },
 
   // Engagement
   async getEngagement() {
+    assertPool();
     const res = await pool.query('SELECT raw_data FROM sales_brain_engagement ORDER BY timestamp DESC');
     return res.rows.map(r => r.raw_data);
   },
 
   // Searches
   async getSearches() {
+    assertPool();
     const res = await pool.query('SELECT * FROM sales_brain_searches ORDER BY created_at DESC');
     return res.rows;
   }

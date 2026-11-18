@@ -491,52 +491,70 @@ export function createSalesBrainApi() {
       }
 
       // 11. Database Status & Verification: GET /db-status
-      if (method === 'GET' && subpath === '/db-status') {
-        try {
-          const client = await pool.connect();
-          const counts = {};
-          const tables = [
-            'canada_prospects',
-            'sales_brain_leads',
-            'sales_brain_icps',
-            'sales_brain_drafts',
-            'sales_brain_searches',
-            'sales_brain_automations',
-            'sales_brain_followups',
-            'sales_brain_engagement',
-            'wealth_signals',
-            'custom_sources'
-          ];
-          for (const t of tables) {
-            const r = await client.query(`SELECT COUNT(*)::int as count FROM "${t}"`);
-            counts[t] = r.rows[0].count;
-          }
-          client.release();
-          return jsonResponse(res, 200, {
-            status: 'connected',
-            database: 'railway',
-            host: 'metro.proxy.rlwy.net',
-            port: 52123,
-            counts
-          }), true;
-        } catch (dbErr) {
-          return jsonResponse(res, 500, {
-            status: 'error',
-            message: dbErr.message
-          }), true;
-        }
-      }
+            if (method === 'GET' && subpath === '/db-status') {
+              if (!pool) {
+                return jsonResponse(res, 503, {
+                  status: 'unconfigured',
+                  message: 'DATABASE_URL not set in environment'
+                }), true;
+              }
+              try {
+                const client = await pool.connect();
+                const counts = {};
+                const tables = [
+                  'canada_prospects',
+                  'sales_brain_leads',
+                  'sales_brain_icps',
+                  'sales_brain_drafts',
+                  'sales_brain_searches',
+                  'sales_brain_automations',
+                  'sales_brain_followups',
+                  'sales_brain_engagement',
+                  'wealth_signals',
+                  'custom_sources'
+                ];
+                for (const t of tables) {
+                  const r = await client.query(`SELECT COUNT(*)::int as count FROM "${t}"`);
+                  counts[t] = r.rows[0].count;
+                }
+                client.release();
+                // Extract host/port from DATABASE_URL if available
+                let dbHost = 'unknown', dbPort = 'unknown';
+                if (process.env.DATABASE_URL) {
+                  try {
+                    const u = new URL(process.env.DATABASE_URL);
+                    dbHost = u.hostname;
+                    dbPort = u.port || (u.protocol === 'postgresql:' ? '5432' : 'unknown');
+                  } catch {}
+                }
+                return jsonResponse(res, 200, {
+                  status: 'connected',
+                  database: 'postgresql',
+                  host: dbHost,
+                  port: dbPort,
+                  counts
+                }), true;
+              } catch (dbErr) {
+                return jsonResponse(res, 500, {
+                  status: 'error',
+                  message: dbErr.message
+                }), true;
+              }
+            }
 
       // 12. Canada Prospects from Postgres: GET /canada-prospects
-      if (method === 'GET' && subpath === '/canada-prospects') {
-        try {
-          const limit = parseInt(query.limit || '100', 10);
-          const prospects = await db.getCanadaProspects(limit);
-          return jsonResponse(res, 200, { total: prospects.length, prospects }), true;
-        } catch (dbErr) {
-          return jsonResponse(res, 500, { error: dbErr.message }), true;
-        }
-      }
+            if (method === 'GET' && subpath === '/canada-prospects') {
+              if (!pool) {
+                return jsonResponse(res, 503, { error: 'DATABASE_URL not set in environment' }), true;
+              }
+              try {
+                const limit = parseInt(query.limit || '100', 10);
+                const prospects = await db.getCanadaProspects(limit);
+                return jsonResponse(res, 200, { total: prospects.length, prospects }), true;
+              } catch (dbErr) {
+                return jsonResponse(res, 500, { error: dbErr.message }), true;
+              }
+            }
 
       // Fallback
       return jsonResponse(res, 404, { error: `Endpoint not found: ${method} ${subpath}` }), true;
