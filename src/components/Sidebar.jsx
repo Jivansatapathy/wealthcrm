@@ -1,8 +1,22 @@
 import React from 'react';
 import { ENABLED_VIEWS } from '../views';
-import { Zap, BarChart3, Building2, RefreshCw, Bot, TrendingUp, Radar, ShieldCheck, BrainCircuit } from 'lucide-react';
+import { Zap, BarChart3, Building2, RefreshCw, Bot, TrendingUp, Radar, ShieldCheck, BrainCircuit, LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
-export default function Sidebar({ currentView, setCurrentView, open, onClose, intentCount, pendingReferralCount, user }) {
+export default function Sidebar({ currentView, setCurrentView, open, onClose, intentCount, pendingReferralCount, user: defaultUser }) {
+  const { user: authUser, logout } = useAuth();
+  const activeUser = authUser || defaultUser || { fullName: 'Advisor', title: 'Wealth Advisory', role: 'advisor' };
+
+  // Calculate Initials
+  const nameToUse = activeUser.fullName || activeUser.name || 'User';
+  const initials = nameToUse
+    .split(' ')
+    .filter(Boolean)
+    .map(n => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   const allSections = [
     {
       title: "Client Acquisition Engine",
@@ -12,32 +26,37 @@ export default function Sidebar({ currentView, setCurrentView, open, onClose, in
           label: "AI Intent Engine",
           icon: <Zap size={18} className="text-amber-400" />,
           badge: `${intentCount} Signals`,
-          isLive: true
+          isLive: true,
+          roles: ['admin', 'advisor', 'user']
         },
         {
           id: "sales_brain",
           label: "AI Sales Brain",
           icon: <BrainCircuit size={18} className="text-purple-400" />,
           badge: "Autonomous",
-          isLive: true
+          isLive: true,
+          roles: ['admin', 'advisor']
         },
         {
           id: "source_intel",
           label: "Source Intelligence",
           icon: <Radar size={18} />,
-          badge: "Scraper"
+          badge: "Scraper",
+          roles: ['admin', 'advisor']
         },
         {
           id: "acquisition",
           label: "Lead Acquisition",
           icon: <ShieldCheck size={18} />,
-          badge: "Verified"
+          badge: "Verified",
+          roles: ['admin'] // Restricted to admin
         },
         {
           id: "pipeline",
           label: "Opportunity Pipeline",
           icon: <BarChart3 size={18} />,
-          badge: "$142.8M"
+          badge: "$142.8M",
+          roles: ['admin', 'advisor', 'user']
         }
       ]
     },
@@ -47,14 +66,16 @@ export default function Sidebar({ currentView, setCurrentView, open, onClose, in
         {
           id: "client360",
           label: "Client 360° & Households",
-          icon: <Building2 size={18} />
+          icon: <Building2 size={18} />,
+          roles: ['admin', 'advisor', 'user']
         },
         {
           id: "referrals",
           label: "Cross-Division Referrals",
           icon: <RefreshCw size={18} />,
           badge: `${pendingReferralCount} Pending`,
-          badgeStyle: { background: "rgba(245, 158, 11, 0.2)", color: "#FBBF24" }
+          badgeStyle: { background: "rgba(245, 158, 11, 0.2)", color: "#FBBF24" },
+          roles: ['admin', 'advisor']
         }
       ]
     },
@@ -64,19 +85,28 @@ export default function Sidebar({ currentView, setCurrentView, open, onClose, in
         {
           id: "copilot",
           label: "AI Advisor Copilot",
-          icon: <Bot size={18} />
+          icon: <Bot size={18} />,
+          roles: ['admin', 'advisor']
         },
         {
           id: "analytics",
           label: "Executive Analytics",
-          icon: <TrendingUp size={18} />
+          icon: <TrendingUp size={18} />,
+          roles: ['admin'] // Restricted to admin
         }
       ]
     }
   ];
 
+  // Filter sections and items based on role
+  const userRole = activeUser.role || 'user';
   const navSections = allSections
-    .map((s) => ({ ...s, items: s.items.filter((i) => ENABLED_VIEWS.includes(i.id)) }))
+    .map((s) => ({
+      ...s,
+      items: s.items
+        .filter((i) => ENABLED_VIEWS.includes(i.id))
+        .filter((i) => !i.roles || i.roles.includes(userRole) || userRole === 'admin')
+    }))
     .filter((s) => s.items.length);
 
   return (
@@ -119,14 +149,27 @@ export default function Sidebar({ currentView, setCurrentView, open, onClose, in
         ))}
       </nav>
 
-      {/* Advisor Profile Footer */}
+      {/* User Profile & Sign Out Footer */}
       <div className="sidebar-footer">
-        <div className="advisor-pill">
-          <div className="advisor-avatar">CS</div>
-          <div className="advisor-info">
-            <div className="advisor-name">{user.name}</div>
-            <div className="advisor-role">{user.title}</div>
+        <div className="sidebar-user-card">
+          <div className="sidebar-user-info">
+            <div className="sidebar-user-avatar">{initials}</div>
+            <div className="sidebar-user-text">
+              <div className="sidebar-user-name" title={nameToUse}>{nameToUse}</div>
+              <span className={`sidebar-user-role-badge ${userRole}`}>
+                {userRole === 'admin' ? 'Compliance Admin' : userRole === 'advisor' ? 'Wealth Advisor' : 'Standard User'}
+              </span>
+            </div>
           </div>
+          <button
+            type="button"
+            className="sidebar-logout-btn"
+            onClick={logout}
+            title="Sign Out of Session"
+          >
+            <LogOut size={13} />
+            <span>Sign Out</span>
+          </button>
         </div>
       </div>
     </aside>

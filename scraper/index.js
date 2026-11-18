@@ -9,6 +9,7 @@ import { runScrape, isSafeUrl } from './pipeline.js';
 import { BUILTIN_SOURCES } from './sources.js';
 import { createContext, createApi, startScheduler } from './acquisition/index.js';
 import { createSalesBrainApi } from './sales-brain/api.js';
+import { createAuthApi } from './auth/index.js';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(DIR, 'data');
@@ -120,9 +121,13 @@ const readBody = (req) => new Promise((resolve) => { let b = ''; req.on('data', 
 const acqCtx = createContext({ customSources: () => readJson(CUSTOM_FILE, []), crmData: await loadCrm() });
 const acqApi = createApi(acqCtx);
 const salesBrainApi = createSalesBrainApi();
+const authApi = createAuthApi();
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
+  if (url.pathname.startsWith('/auth') || url.pathname.startsWith('/api/auth')) {
+    if (await authApi(req, res, url.pathname)) return;
+  }
   if (await acqApi(req, res, url)) return;
   if (url.pathname.startsWith('/sales-brain')) {
     const q = Object.fromEntries(url.searchParams.entries());

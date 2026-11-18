@@ -133,6 +133,11 @@ export default defineConfig({
     open: false,
     // Intent scraper service (npm run scraper)
     proxy: {
+      '/api/auth': {
+        target: 'http://localhost:3100',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api\/auth/, '/auth')
+      },
       // Lead-acquisition pipeline (same scraper service, /acq routes)
       '/api/acq': {
         target: 'http://localhost:3100',

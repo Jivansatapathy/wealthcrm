@@ -13,22 +13,58 @@ import AdvisorCopilotView from './components/AdvisorCopilotView';
 import ExecutiveAnalyticsView from './components/ExecutiveAnalyticsView';
 import LeadDetailDrawer from './components/LeadDetailDrawer';
 import ToastContainer from './components/ToastContainer';
+import LoginView from './components/LoginView';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ENABLED_VIEWS } from './views';
 import { fetchCanadianMarketIntelligence } from './services/marketDataService';
+import { ShieldAlert } from 'lucide-react';
 
-export default function App() {
+const VIEW_PERMISSIONS = {
+  intent_stream: ['admin', 'advisor', 'user'],
+  pipeline: ['admin', 'advisor', 'user'],
+  client360: ['admin', 'advisor', 'user'],
+  source_intel: ['admin', 'advisor'],
+  sales_brain: ['admin', 'advisor'],
+  referrals: ['admin', 'advisor'],
+  copilot: ['admin', 'advisor'],
+  acquisition: ['admin'],
+  analytics: ['admin']
+};
+
+function AccessRestricted({ viewId, userRole }) {
+  return (
+    <div className="access-denied-container">
+      <div className="access-denied-icon-wrap">
+        <ShieldAlert size={32} />
+      </div>
+      <h3>403 — Access Restricted</h3>
+      <p>
+        The <strong>{viewId.replace('_', ' ').toUpperCase()}</strong> module requires elevated permissions.
+        Your current role is <strong>{userRole || 'standard user'}</strong>.
+      </p>
+      <div className="login-compliance-badge">
+        <span>OSFI B-13 Role-Based Security Enforcement Active</span>
+      </div>
+    </div>
+  );
+}
+
+function MainAppShell() {
+  const { user, isAuthenticated, isLoading } = useAuth();
+
   // Deep link support, e.g. http://localhost:3000/#source_intel
   const [currentView, setCurrentView] = useState(() => {
     const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : '';
     return ENABLED_VIEWS.includes(hash) ? hash : 'intent_stream';
   });
   const [searchQuery, setSearchQuery] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false); // sidebar drawer on narrow screens
+  const [menuOpen, setMenuOpen] = useState(false);
   const [leads, setLeads] = useState([...WEALTH_DATA.intentLeads]);
   const [pipeline, setPipeline] = useState([...WEALTH_DATA.pipelineOpportunities]);
   const [referrals, setReferrals] = useState([...WEALTH_DATA.referrals]);
   const [kpi, setKpi] = useState({ ...WEALTH_DATA.kpiMetrics });
   const [simulatedQueue, setSimulatedQueue] = useState([...WEALTH_DATA.simulatedIncomingLeads]);
+  const [isLiveLoading, setIsLiveLoading] = useState(false);
 
   // Drawer state
   const [drawerLead, setDrawerLead] = useState(null);
@@ -46,7 +82,6 @@ export default function App() {
     }, 4500);
   };
 
-  // Open Lead Drawer
   const handleOpenDrawer = (lead, defaultTab = 'email') => {
     setDrawerLead(lead);
     setDrawerTab(defaultTab);
@@ -57,126 +92,120 @@ export default function App() {
     setDrawerOpen(false);
   };
 
-  // Promote Lead to Pipeline
   const handlePromoteLead = (lead) => {
-    const existing = pipeline.find(p => p.leadId === lead.id);
-    if (existing) {
-      showToast(`${lead.name} is already in the Wealth Opportunity Pipeline.`, 'info');
-      return;
-    }
-
-    const newOpp = {
-      id: `OPP-${Math.floor(300 + Math.random() * 699)}`,
-      name: `${lead.name} - ${lead.targetDivision} Mandate`,
-      leadId: lead.id,
+    const newOpportunity = {
+      id: `OPP-${Date.now()}`,
       clientName: lead.name,
       company: lead.company,
-      stage: "advisor_qualified",
-      stageLabel: "Advisor Qualified",
+      title: lead.title,
       estimatedAUM: lead.estimatedAUM,
-      probability: "50%",
-      expectedRevenue: /\d/.test(lead.estimatedAUM)
-        ? `$${Math.round(parseInt(lead.estimatedAUM.replace(/[^0-9]/g, '')) * 0.009 * 1000).toLocaleString()}/yr`
-        : 'To be sized',
-      assignedAdvisor: WEALTH_DATA.currentUser.name,
-      division: lead.targetDivision,
-      nextAction: "Deliver AI customized corporate wealth briefing",
-      targetCloseDate: "Nov 30, 2026",
-      notes: `Promoted from AI Intent Engine (${lead.intentScore}/100 score). Trigger: ${lead.primarySignalType}`
+      stage: "Qualified Discovery",
+      probability: 75,
+      targetDivision: lead.targetDivision,
+      primarySignal: lead.primarySignalType,
+      leadSource: lead.signals?.[0]?.source || "AI Intent Engine",
+      urgency: lead.urgency,
+      assignedAdvisor: user?.fullName || WEALTH_DATA.currentUser.name,
+      dateAdded: "Today",
+      daysInStage: 1,
+      householdId: `HH-${Date.now()}`,
+      nextStep: "Schedule Discretionary Mandate Discovery Session",
+      actionItems: [
+        "Review Corporate Class Holding Company structure",
+        "Prepare customized ScotiaMcLeod wealth proposition"
+      ]
     };
 
-    setPipeline(prev => [newOpp, ...prev]);
-    showToast(`🎉 ${lead.name} promoted to Wealth Opportunity Pipeline!`, 'success');
+    setPipeline(prev => [newOpportunity, ...prev]);
+    setLeads(prev => prev.filter(l => l.id !== lead.id));
+    showToast(`Opportunity created for ${lead.name} (${lead.estimatedAUM})`, 'success');
   };
 
-  // Advance Pipeline Stage
-  const handleAdvanceStage = (dealId) => {
-    const stageOrder = [
-      "intent_detected",
-      "advisor_qualified",
-      "discovery_scheduled",
-      "wealth_plan_presented",
-      "kyc_onboarding",
-      "funded_active"
-    ];
-
-    setPipeline(prev => prev.map(deal => {
-      if (deal.id === dealId) {
-        const idx = stageOrder.indexOf(deal.stage);
-        if (idx >= 0 && idx < stageOrder.length - 1) {
-          const nextStage = stageOrder[idx + 1];
-          showToast(`Mandate "${deal.name}" advanced to next stage!`, 'success');
-          return { ...deal, stage: nextStage };
-        }
+  const handleAdvanceStage = (opportunityId, newStage, newProbability) => {
+    setPipeline(prev => prev.map(opp => {
+      if (opp.id === opportunityId) {
+        return {
+          ...opp,
+          stage: newStage,
+          probability: newProbability,
+          daysInStage: 1
+        };
       }
-      return deal;
+      return opp;
     }));
+    showToast(`Opportunity advanced to ${newStage}`, 'success');
   };
 
-  // Accept Cross-Division Referral
-  const handleAcceptReferral = (refId) => {
-    setReferrals(prev => prev.map(r => {
-      if (r.id === refId) {
-        showToast(`Referral ${refId} accepted! Internal attribution recorded for Commercial RM.`, 'success');
-        return { ...r, status: 'Accepted' };
+  const handleAcceptReferral = (referralId) => {
+    setReferrals(prev => prev.map(ref => {
+      if (ref.id === referralId) {
+        return { ...ref, status: "Accepted" };
       }
-      return r;
+      return ref;
     }));
+    showToast("Referral accepted! Notification dispatched to Commercial Banking RM.", 'success');
   };
 
-  // Simulate Live Intent Influx
   const handleSimulateIntent = () => {
     if (simulatedQueue.length === 0) {
-      showToast("All simulated intent scenarios have already been triggered.", "info");
+      showToast("All simulated intent signals for today have been consumed.", 'info');
       return;
     }
-
     const nextLead = simulatedQueue[0];
     setSimulatedQueue(prev => prev.slice(1));
-
-    const enrichedLead = { ...nextLead, isNewSimulation: true };
-    setLeads(prev => [enrichedLead, ...prev]);
-
-    setKpi(prev => ({
-      ...prev,
-      intentLeadsDetectedThisMonth: prev.intentLeadsDetectedThisMonth + 1,
-      totalPipelineAUM: "$151.7M"
-    }));
-
-    showToast(`⚡ High Intent Trigger Detected: ${enrichedLead.name} (${enrichedLead.estimatedAUM} AUM Potential - ${enrichedLead.primarySignalType})`, "alert");
-
-    // Automatically open drawer if in intent stream for high-impact demo
-    if (currentView === 'intent_stream') {
-      setTimeout(() => {
-        handleOpenDrawer(enrichedLead, 'brief');
-      }, 400);
-    }
+    setLeads(prev => [nextLead, ...prev]);
+    showToast(`⚡ High Intent Alert: ${nextLead.name} (${nextLead.estimatedAUM})`, 'warn');
   };
-
-  // Live Canadian Market Data Ingestion
-  const [isLiveLoading, setIsLiveLoading] = useState(false);
 
   const handleFetchLiveMarketData = async () => {
     setIsLiveLoading(true);
-    showToast("Connecting to live Canadian Corporate Press Wire & Market Data feeds...", "info");
     try {
+      showToast('Connecting to Canadian GlobeNewswire & SEDAR+ live wire feed...', 'info');
       const data = await fetchCanadianMarketIntelligence();
-      if (data.leads?.length > 0) {
+      if (data && data.leads && data.leads.length > 0) {
         setLeads(prev => {
           const existingIds = new Set(prev.map(l => l.id));
-          const newLeads = data.leads.filter(l => !existingIds.has(l.id));
-          return [...newLeads, ...prev];
+          const uniqueNewLeads = data.leads.filter(l => !existingIds.has(l.id));
+          return [...uniqueNewLeads, ...prev];
         });
-        showToast(`⚡ Ingested ${data.leads.length} real Canadian corporate filings & signals from ${data.source || 'live feeds'}!`, "success");
+        showToast(`Ingested ${data.leads.length} real-time Canadian market disclosures`, 'success');
       } else {
-        showToast("Live feed active. No new filings detected at this second.", "info");
+        showToast('Live wire active. No new unread material disclosures.', 'info');
       }
     } catch (err) {
-      showToast("Live feed request: " + err.message, "info");
+      showToast(`Market intelligence feed notice: ${err.message}`, 'error');
     } finally {
       setIsLiveLoading(false);
     }
   };
+
+  // 1. Loading splash
+  if (isLoading) {
+    return (
+      <div className="login-screen-wrapper">
+        <div style={{ textAlign: 'center', color: '#FFFFFF' }}>
+          <div className="login-logo-badge" style={{ marginBottom: 16 }}>
+            <span className="login-logo-accent">VGT</span>
+            <span className="login-logo-sub">AI</span>
+          </div>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', marginBottom: 8 }}>
+            Initializing Banking Security Environment...
+          </h3>
+          <p style={{ color: '#94A3B8', fontSize: '0.85rem' }}>Verifying OSFI B-13 session token</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated Guard -> Render LoginView
+  if (!isAuthenticated) {
+    return <LoginView />;
+  }
+
+  // 3. Role-Based View Guard
+  const userRole = user?.role || 'user';
+  const allowedRoles = VIEW_PERMISSIONS[currentView] || ['admin'];
+  const isAuthorized = userRole === 'admin' || allowedRoles.includes(userRole);
 
   const pendingReferralCount = referrals.filter(r => r.status !== 'Accepted').length;
 
@@ -190,7 +219,7 @@ export default function App() {
         onClose={() => setMenuOpen(false)}
         intentCount={leads.length}
         pendingReferralCount={pendingReferralCount}
-        user={WEALTH_DATA.currentUser}
+        user={user || WEALTH_DATA.currentUser}
       />
 
       {/* Main App Area */}
@@ -204,60 +233,66 @@ export default function App() {
         />
 
         <section className="page-viewport">
-          {currentView === 'intent_stream' && (
-            <IntentEngineView
-              leads={leads}
-              kpi={kpi}
-              searchQuery={searchQuery}
-              onOpenDrawer={handleOpenDrawer}
-              onPromoteLead={handlePromoteLead}
-              onSimulateIntent={handleSimulateIntent}
-              onFetchLiveMarketData={handleFetchLiveMarketData}
-              isLiveLoading={isLiveLoading}
-              onOpenSources={() => setCurrentView('source_intel')}
-            />
-          )}
+          {!isAuthorized ? (
+            <AccessRestricted viewId={currentView} userRole={userRole} />
+          ) : (
+            <>
+              {currentView === 'intent_stream' && (
+                <IntentEngineView
+                  leads={leads}
+                  kpi={kpi}
+                  searchQuery={searchQuery}
+                  onOpenDrawer={handleOpenDrawer}
+                  onPromoteLead={handlePromoteLead}
+                  onSimulateIntent={handleSimulateIntent}
+                  onFetchLiveMarketData={handleFetchLiveMarketData}
+                  isLiveLoading={isLiveLoading}
+                  onOpenSources={() => setCurrentView('source_intel')}
+                />
+              )}
 
-          {currentView === 'source_intel' && (
-            <SourceIntelligenceView onFetchLiveMarketData={handleFetchLiveMarketData} />
-          )}
+              {currentView === 'source_intel' && (
+                <SourceIntelligenceView onFetchLiveMarketData={handleFetchLiveMarketData} />
+              )}
 
-          {currentView === 'acquisition' && (
-            <LeadAcquisitionView onPromoteLead={handlePromoteLead} showToast={showToast} />
-          )}
+              {currentView === 'acquisition' && (
+                <LeadAcquisitionView onPromoteLead={handlePromoteLead} showToast={showToast} />
+              )}
 
-          {currentView === 'sales_brain' && (
-            <SalesBrainView showToast={showToast} />
-          )}
+              {currentView === 'sales_brain' && (
+                <SalesBrainView showToast={showToast} />
+              )}
 
-          {currentView === 'pipeline' && (
-            <OpportunityPipelineView
-              pipeline={pipeline}
-              onAdvanceStage={handleAdvanceStage}
-              showToast={showToast}
-            />
-          )}
+              {currentView === 'pipeline' && (
+                <OpportunityPipelineView
+                  pipeline={pipeline}
+                  onAdvanceStage={handleAdvanceStage}
+                  showToast={showToast}
+                />
+              )}
 
-          {currentView === 'client360' && (
-            <Client360View />
-          )}
+              {currentView === 'client360' && (
+                <Client360View />
+              )}
 
-          {currentView === 'referrals' && (
-            <ReferralHubView
-              referrals={referrals}
-              onAcceptReferral={handleAcceptReferral}
-              showToast={showToast}
-            />
-          )}
+              {currentView === 'referrals' && (
+                <ReferralHubView
+                  referrals={referrals}
+                  onAcceptReferral={handleAcceptReferral}
+                  showToast={showToast}
+                />
+              )}
 
-          {currentView === 'copilot' && (
-            <AdvisorCopilotView
-              showToast={showToast}
-            />
-          )}
+              {currentView === 'copilot' && (
+                <AdvisorCopilotView
+                  showToast={showToast}
+                />
+              )}
 
-          {currentView === 'analytics' && (
-            <ExecutiveAnalyticsView />
+              {currentView === 'analytics' && (
+                <ExecutiveAnalyticsView />
+              )}
+            </>
           )}
         </section>
       </main>
@@ -275,5 +310,13 @@ export default function App() {
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainAppShell />
+    </AuthProvider>
   );
 }
